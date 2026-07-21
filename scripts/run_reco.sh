@@ -22,4 +22,4 @@ done
 
 mkdir -p /workdir/sampic-to-midas/output
 cd /workdir/sampic-to-midas/output
-exec gaudirun.py /workdir/sampic-to-midas/gaudi/sampic-to-midas.py
+exec gaudirun.py /workdir/sampic-to-midas/gaudi/sampic_demo.py

@@ -7,7 +7,7 @@ Chain: PIMidasSelector (reads the .mid produced by converter/bin_to_mid.py)
 Run inside the pioneer-midas container after building main with the testbeam
 libraries (./setup.sh -b -t -e):
 
-    SAMPIC_MID=... SAMPIC_REC=... gaudirun.py sampic-to-midas.py
+    SAMPIC_MID=... SAMPIC_REC=... gaudirun.py sampic_demo.py
 
 The output RNTuple "rec" has fields named after the TES paths with non-alnum
 chars replaced by '_': _Event_SampicEvent, _Event_SampicEventTiming,

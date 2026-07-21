@@ -70,6 +70,29 @@ scripts/run_container.sh
   # open notebooks/waveform_explorer.ipynb
 ```
 
+## ROOT input (already-unpacked data)
+
+`converter/root_to_mid.py` is the ROOT-input sibling of `bin_to_mid.py`: it
+reads a `dat_to_root`-style `wfms` TTree (uproot + numpy required, e.g. the
+pioneer container) and produces the same MIDAS format through the same event
+builder and bank writers. `WaveformData` (volts, double) is converted back to
+the raw int16 counts — the exact inverse of the counts/1e4 unpacking — so all
+downstream code and validators are shared. Multi-channel trees are sorted by
+`StartTime` before clustering. Use `--entry-stop`/`--max-events` to slice
+large files; `tools/validate_midas_root.py` is the matching round-trip gate.
+
+Example (TRIUMF surface-muon run 108, 2.3M hits, 32 channels; first 1000
+events): 20k entries -> sort -> gap-100 ns clustering gives 2316 hits in 1000
+genuine coincidence events (mean 2.3, max 7 hits/event), bitwise-validated
+and decoded through the Gaudi chain:
+
+```bash
+python3 converter/root_to_mid.py RUN108.root -o output/run108_first1000.mid \
+    --gap-ns 100 --entry-stop 20000 --max-events 1000
+python3 tools/validate_midas_root.py RUN108.root output/run108_first1000.mid \
+    --gap-ns 100 --entry-stop 20000
+```
+
 ## Regenerating the cross-check reference
 
 The `.root` shipped with run914 in the test-beam `data/` folder is **empty**
