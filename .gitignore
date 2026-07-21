@@ -219,3 +219,6 @@ __marimo__/
 
 # Produced MIDAS/ROOT artifacts
 output/
+*.root
+*.mid 
+*.dat
