@@ -1,0 +1,3 @@
+# Host-side converter/validator deps only (python >= 3.8).
+# The Gaudi/notebook side runs in the pioneer-midas container.
+numpy>=1.17,<1.25
