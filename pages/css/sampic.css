@@ -1,0 +1,75 @@
+/* Only what midas.css does not already cover. */
+
+#sdqm-root { padding: 8px 12px 24px; }
+
+.sdqm-banner { padding: 8px 12px; margin: 8px 0; border-radius: 4px;
+               border-left: 4px solid #888; background: #f4f4f6; font-size: 14px; }
+.sdqm-banner.warn  { border-left-color: #d79a21; background: #fdf6e6; }
+.sdqm-banner.error { border-left-color: #c0392b; background: #fbeae8; }
+
+.sdqm-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.sdqm-card { border: 1px solid #d7d7dd; border-radius: 5px; background: #fff;
+             padding: 10px 12px; margin: 8px 0; }
+.sdqm-card h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600;
+                color: #33343a; letter-spacing: .02em; }
+
+.sdqm-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+                 margin: 6px 0 10px; font-size: 13px; }
+.sdqm-controls label { display: flex; gap: 4px; align-items: center; }
+
+/* Statistic tiles */
+.sdqm-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+.sdqm-tile { min-width: 116px; border: 1px solid #d7d7dd; border-radius: 5px;
+             padding: 7px 10px; background: #fff; }
+.sdqm-tile .k { font-size: 11px; color: #6a6b73; text-transform: uppercase;
+                letter-spacing: .04em; }
+.sdqm-tile .v { font-size: 19px; font-variant-numeric: tabular-nums; color: #22232a; }
+.sdqm-tile.warn .v { color: #b8791a; }
+.sdqm-tile.bad  .v { color: #c0392b; }
+
+/* Strip map: one row per plane, one cell per strip */
+.sdqm-planes { display: flex; flex-direction: column; gap: 3px; }
+.sdqm-plane { display: flex; align-items: center; gap: 6px; }
+.sdqm-plane .name { width: 92px; font-size: 12px; color: #4a4b52;
+                    font-variant-numeric: tabular-nums; text-align: right; }
+.sdqm-strips { display: flex; gap: 2px; }
+.sdqm-strip { width: 30px; height: 26px; border-radius: 3px; display: flex;
+              align-items: center; justify-content: center; font-size: 10px;
+              color: #e8e8ee; cursor: default; }
+.sdqm-strip.unmapped { color: #6a6b73; }
+
+.sdqm-scale { display: flex; align-items: center; gap: 6px; font-size: 12px;
+              color: #5a5b62; margin-top: 8px; }
+.sdqm-scale .bar { width: 160px; height: 11px; border-radius: 3px;
+                   background: linear-gradient(to right, #16171b, #1f4e79,
+                               #2b8cbe, #78c679, #f7d758, #f0823c); }
+
+table.sdqm { border-collapse: collapse; font-size: 13px; }
+table.sdqm th, table.sdqm td { padding: 3px 9px; border-bottom: 1px solid #e6e6ea;
+                               text-align: right; font-variant-numeric: tabular-nums; }
+table.sdqm th { text-align: right; color: #6a6b73; font-weight: 600; }
+table.sdqm td.name, table.sdqm th.name { text-align: left; }
+
+.sdqm-plot { width: 100%; height: 380px; }
+.sdqm-muted { color: #7a7b82; font-size: 12px; }
+
+/* Waveform grid: one row per plane, one column per strip */
+.sdqm-grid { display: grid; gap: 2px; align-items: center;
+             overflow-x: auto; padding-bottom: 4px; }
+.sdqm-grid-corner { }
+.sdqm-grid-colhead { font-size: 11px; color: #6a6b73; text-align: center;
+                     font-variant-numeric: tabular-nums; }
+.sdqm-grid-rowhead { font-size: 12px; color: #4a4b52; text-align: right;
+                     padding-right: 8px; white-space: nowrap; }
+.sdqm-grid-cell { line-height: 0; }
+.sdqm-grid-cell canvas { border: 1px solid #dcdce3; border-radius: 2px;
+                         display: block; }
+
+/* Freshness chip: the same three states on every page */
+.sdqm-chip { display: inline-block; padding: 1px 8px; border-radius: 10px;
+             font-size: 11px; font-weight: 600; letter-spacing: .02em;
+             border: 1px solid transparent; vertical-align: middle; }
+.sdqm-chip.live  { background: #e6f4ea; color: #1c6b34; border-color: #b7dfc4; }
+.sdqm-chip.stale { background: #fdf3e3; color: #96601a; border-color: #ecd3a6; }
+.sdqm-chip.never { background: #f0f0f3; color: #61626a; border-color: #dcdce3; }
+.sdqm-stale-data { opacity: .55; }

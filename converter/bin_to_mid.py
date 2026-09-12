@@ -70,11 +70,20 @@ def convert(args) -> int:
                   "(slow path)", file=sys.stderr)
 
         def chunks():
+            nonlocal n_hits_read
             if order is not None:
-                for start in range(0, len(order), args.chunk_hits):
-                    yield bf.hits[order[start:start + args.chunk_hits]]
+                it = (bf.hits[order[s:s + args.chunk_hits]]
+                      for s in range(0, len(order), args.chunk_hits))
             else:
-                yield from bf.iter_chunks(args.chunk_hits)
+                it = bf.iter_chunks(args.chunk_hits)
+            for chunk in it:
+                if args.max_hits is not None:
+                    remaining = args.max_hits - n_hits_read
+                    if remaining <= 0:
+                        return
+                    chunk = chunk[:remaining]
+                n_hits_read += len(chunk)
+                yield chunk
 
         n_hits_read = 0
         n_hits_written = 0
@@ -85,62 +94,58 @@ def convert(args) -> int:
             if not args.no_bor_eor:
                 writer.write_bor(run_number, int(header.unix_time))
 
-            # carry: AD records + t0s of the trailing unfinished cluster
-            carry_ad = np.empty(0, dtype=sampic_banks.AD_HIT_DTYPE)
-            carry_t0 = np.empty(0, dtype="<f8")
             serial = 0
-            done = False
 
-            def flush(ad, t0s):
+            def flush_batch(batch):
+                """Write one MIDAS event per cluster, converting the batch once.
+
+                `build_ad_records` is elementwise, so how its input is grouped
+                cannot change a single output byte -- but calling it per event
+                would pay numpy's per-call overhead once per cluster, which for
+                a file like run914 (42k single-hit events) dominates everything
+                else. Convert the whole batch, then slice it back apart.
+                """
                 nonlocal serial, n_events, n_hits_written
                 nonlocal hits_per_event_min, hits_per_event_max
-                banks = [(sampic_banks.AD_BANK_NAME, TID_BYTE, ad.tobytes())]
-                if not args.no_timing_bank:
-                    banks.append((sampic_banks.AT_BANK_NAME, TID_BYTE,
-                                  sampic_banks.build_at_payload(t0s[0], len(ad))))
-                writer.write_event(PHYSICS_EVENT_ID, 0, serial,
-                                   int(header.unix_time + t0s[0] * 1e-9), banks)
-                serial += 1
-                n_events += 1
-                n_hits_written += len(ad)
-                n = len(ad)
-                hits_per_event_min = n if hits_per_event_min is None \
-                    else min(hits_per_event_min, n)
-                hits_per_event_max = max(hits_per_event_max, n)
-
-            for chunk in chunks():
-                if done:
-                    break
-                if args.max_hits is not None:
-                    remaining = args.max_hits - n_hits_read
-                    if remaining <= 0:
-                        break
-                    chunk = chunk[:remaining]
-                n_hits_read += len(chunk)
-
-                ad = sampic_banks.build_ad_records(
-                    chunk, fe_board_index,
+                if not batch:
+                    return
+                joined = np.concatenate(batch) if len(batch) > 1 else batch[0]
+                ad_all = sampic_banks.build_ad_records(
+                    joined, fe_board_index,
                     header.inl_corrected, header.adc_corrected)
-                t0s = np.concatenate((carry_t0, chunk["t0"].astype("<f8")))
-                ad = np.concatenate((carry_ad, ad)) if len(carry_ad) else ad
+                off = 0
+                for cluster in batch:
+                    n = len(cluster)
+                    ad = ad_all[off:off + n]
+                    off += n
+                    t0_first = cluster["t0"][0]
+                    banks = [(sampic_banks.AD_BANK_NAME, TID_BYTE, ad.tobytes())]
+                    if not args.no_timing_bank:
+                        banks.append((sampic_banks.AT_BANK_NAME, TID_BYTE,
+                                      sampic_banks.build_at_payload(t0_first, n)))
+                    writer.write_event(PHYSICS_EVENT_ID, 0, serial,
+                                       int(header.unix_time + t0_first * 1e-9),
+                                       banks)
+                    serial += 1
+                    n_events += 1
+                    n_hits_written += n
+                    hits_per_event_min = n if hits_per_event_min is None \
+                        else min(hits_per_event_min, n)
+                    hits_per_event_max = max(hits_per_event_max, n)
 
-                starts = event_builder.cluster_starts(t0s, args.gap_ns)
-                # keep the last cluster as carry: the next chunk may continue it
-                for i in range(len(starts) - 1):
-                    flush(ad[starts[i]:starts[i + 1]], t0s[starts[i]:starts[i + 1]])
-                    if args.max_events is not None and n_events >= args.max_events:
-                        done = True
-                        break
-                if done:
-                    carry_ad = np.empty(0, dtype=sampic_banks.AD_HIT_DTYPE)
-                    carry_t0 = np.empty(0, dtype="<f8")
+            batch = []
+            batch_hits = 0
+            n_clusters = 0
+            for cluster in event_builder.iter_clusters(chunks(), args.gap_ns):
+                batch.append(cluster)
+                batch_hits += len(cluster)
+                n_clusters += 1
+                if args.max_events is not None and n_clusters >= args.max_events:
                     break
-                carry_ad = ad[starts[-1]:].copy() if len(starts) else ad[:0]
-                carry_t0 = t0s[starts[-1]:].copy() if len(starts) else t0s[:0]
-
-            if len(carry_ad) and not done:
-                if args.max_events is None or n_events < args.max_events:
-                    flush(carry_ad, carry_t0)
+                if batch_hits >= args.chunk_hits:
+                    flush_batch(batch)
+                    batch, batch_hits = [], 0
+            flush_batch(batch)
 
             if not args.no_bor_eor:
                 writer.write_eor(run_number, int(time.time()))

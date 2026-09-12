@@ -17,6 +17,43 @@ the parent directory mounted at `/workdir` in the container. Only the
 `scripts/` and the notebook's default paths depend on that layout — the
 converter and validator are standalone (any python >= 3.8 with numpy).
 
+
+## Two halves
+
+**Offline** (`converter/`, `tools/`) — turn a SAMPIC `.bin` into a `.mid` file,
+and prove it is correct. This is the original content of the repository and is
+described below.
+
+**Live** (`fakesampic/`, `pages/`, `scripts/`) — a MIDAS frontend that produces
+the same events as a continuous stream, so MIDAS custom pages can be developed
+with no detector attached. It replays real `.bin` files on an endless loop,
+generates events for detectors that do not exist yet (8 layers of LGAD strips by
+default), or mixes the two, with every knob in the ODB.
+
+    scripts/setup-conda.sh          # python environment
+    scripts/setup-midas.sh          # build MIDAS from source into ../midas
+    scripts/start-midas.sh          # the experiment -> http://localhost:8080
+    scripts/start-frontend.sh --daemon
+    scripts/register-custom-pages.sh
+
+**New here? Start with [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)** — it
+goes from a machine with nothing installed to a custom page you wrote yourself,
+in about half an hour.
+
+Reference: [INSTALL.md](docs/INSTALL.md) (building MIDAS) ·
+[RUNNING.md](docs/RUNNING.md) (operating it) · [ODB.md](docs/ODB.md) (every
+setting) · [PAGES.md](docs/PAGES.md) (writing pages) ·
+[ANALYZER.md](docs/ANALYZER.md) (the histogram backend, and what it all costs)
+
+The two halves share `converter/sampic_banks.py`, which is the single place any
+hit becomes bank bytes. That is what makes the guarantee below testable: events
+replayed live through MIDAS and written by mlogger are **byte-identical** to the
+same file converted offline — verified over all 42258 events of run914 — and a
+run file from the live frontend goes through the PIONEER Gaudi reconstruction
+unmodified (`scripts/reconstruct.sh`).
+
+---
+
 ## Layout
 
 | Path | Purpose |
