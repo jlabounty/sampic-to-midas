@@ -1,0 +1,30 @@
+<!--
+  SAMPIC Strip Map -- a fake-SAMPIC DQM page.
+
+  Stock MIDAS resources are loaded by bare name so mhttpd serves its own copies;
+  ours carry a ?v= cache-buster, because mhttpd stamps a 24 h Expires header on
+  any /Custom file whose key contains a dot, and an edited page that does not
+  appear is a confusing way to lose an afternoon. Bump ?v= when editing.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SAMPIC Strip Map</title>
+  <link rel="stylesheet" href="midas.css">
+  <script src="controls.js"></script>
+  <script src="midas.js"></script>
+  <script src="mhttpd.js"></script>
+  <script src="mplot.js"></script>
+  <link rel="stylesheet" href="sampic.css?v=1">
+  <script src="sampic-common.js?v=1"></script>
+  <script src="sampic-strips.js?v=1"></script>
+</head>
+<body class="mcss">
+  <div id="mheader"></div>
+  <div id="msidenav"></div>
+  <div id="mmain">
+    <div id="sdqm-root"></div>
+  </div>
+</body>
+</html>
