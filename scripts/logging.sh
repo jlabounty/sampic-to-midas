@@ -36,8 +36,22 @@ RESTART=0
 [ "${2:-}" = "--restart-run" ] && RESTART=1
 
 odb() { odbedit -e "$FS_EXPT_NAME" -c "$1" 2>/dev/null; }
-write_state() { odb 'ls -l "/Logger/Write data"' | awk '/Write data/{print $NF}'; }
-run_state()   { odb 'ls -l /Runinfo' | awk '/^State/{print $NF}'; }
+
+# odbedit echoes the command it was given, BEFORE and AFTER the output, and the
+# echo contains the key name. An unanchored match therefore returns three
+# "values" for one key. Anchor on the start of the line -- only the real value
+# row begins with the key name -- and take the first match.
+odb_value() {
+    # Capture first, then parse. Piping odbedit straight into `awk ... exit`
+    # closes the pipe early, odbedit takes a SIGPIPE, and `set -o pipefail`
+    # turns that into a script abort -- intermittently, depending on whether
+    # odbedit had finished writing, which is the worst kind of bug to inherit.
+    local out
+    out="$(odb "ls -l \"$1\"" || true)"
+    printf '%s\n' "$out" | awk -v k="$2" '$0 ~ "^" k "  " {print $NF; found=1} END{exit !found}' || true
+}
+write_state() { odb_value "/Logger/Write data" "Write data"; }
+run_state()   { odb_value "/Runinfo/State" "State"; }
 
 # /Runinfo/State: 1 stopped, 2 paused, 3 running.
 is_running() { [ "$(run_state)" = "3" ]; }
@@ -79,14 +93,24 @@ case "$ACTION" in
         ;;
     status)
         s="$(write_state)"
-        used="$(du -sh "$FS_DATA_DIR" 2>/dev/null | cut -f1)"
-        n="$(ls "$FS_DATA_DIR"/*.mid* 2>/dev/null | wc -l)"
+        used="$(du -sh "$FS_DATA_DIR" 2>/dev/null | cut -f1 || true)"
+        # Count with a nullglob array, not `ls | wc -l`. With no matching files
+        # ls exits 2, and `set -o pipefail` makes that the pipeline's status,
+        # which `set -e` turns into the script exiting -- silently, and only
+        # once the directory happens to be empty, which is exactly when someone
+        # is most likely to be running this.
+        shopt -s nullglob
+        local_files=("$FS_DATA_DIR"/*.mid "$FS_DATA_DIR"/*.mid.lz4)
+        shopt -u nullglob
+        n=${#local_files[@]}
         if [ "$s" = "y" ]; then
             echo "run-file writing is ON   ($n file(s), $used in $FS_DATA_DIR)"
         else
             echo "run-file writing is OFF  ($n file(s), $used in $FS_DATA_DIR)"
         fi
-        is_running && echo "  a run is active; a change now would wait for the next begin-of-run"
+        if is_running; then
+            echo "  a run is active; a change now would wait for the next begin-of-run"
+        fi
         ;;
     *)
         echo "usage: $(basename "$0") [on|off|status] [--restart-run]" >&2; exit 2 ;;
