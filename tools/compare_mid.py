@@ -13,7 +13,12 @@ numbers, and requiring them to would make the comparison useless for its actual
 purpose. The bank sequence IS the contract with the Gaudi unpacker: it is what
 PIMidasDecoder reads, and nothing else about the file reaches an analysis.
 
-Special events (BOR/EOR/messages) are skipped on both sides for the same reason.
+Special events (BOR/EOR) are skipped on both sides for the same reason.
+
+A live run file also carries events from OTHER equipment -- this frontend's DQM
+equipment writes FSRT/FSAM/FSST into the same buffer, and a real experiment has
+several frontends -- so --event-id selects the stream to compare. Without it,
+"identical" would depend on how many unrelated equipments happened to be running.
 """
 
 import argparse
@@ -25,19 +30,22 @@ if __package__ in (None, ""):
 from converter.mid_reader import iter_events
 
 
-def bank_stream(path):
-    """Yield (event_index, bank_name, tid, payload) for physics events."""
+def bank_stream(path, event_id=None):
+    """Yield (event_index, bank_name, tid, payload) for the selected events."""
     idx = 0
     for ev in iter_events(path):
         if ev.is_special:
+            continue
+        if event_id is not None and ev.event_id != event_id:
             continue
         for name, tid, data in ev.banks:
             yield idx, name, tid, bytes(data)
         idx += 1
 
 
-def compare(path_a: str, path_b: str, max_report: int = 5) -> int:
-    a, b = bank_stream(path_a), bank_stream(path_b)
+def compare(path_a: str, path_b: str, max_report: int = 5,
+            event_id: int = None) -> int:
+    a, b = bank_stream(path_a, event_id), bank_stream(path_b, event_id)
     n_banks = 0
     n_events = 0
     problems = []
@@ -71,7 +79,8 @@ def compare(path_a: str, path_b: str, max_report: int = 5) -> int:
                 break
 
     print(f"{path_a}\n{path_b}")
-    print(f"  compared {n_banks} banks across {n_events} physics events")
+    which = "physics" if event_id is None else f"event-id-{event_id}"
+    print(f"  compared {n_banks} banks across {n_events} {which} events")
     if problems:
         for p in problems:
             print(f"  [FAIL] {p}")
@@ -87,8 +96,11 @@ def main(argv=None) -> int:
     p.add_argument("a")
     p.add_argument("b")
     p.add_argument("--max-report", type=int, default=5)
+    p.add_argument("--event-id", type=int, default=None,
+                   help="compare only events with this event ID (e.g. 1 for the "
+                        "physics stream, excluding other equipment's events)")
     args = p.parse_args(argv)
-    return compare(args.a, args.b, args.max_report)
+    return compare(args.a, args.b, args.max_report, args.event_id)
 
 
 if __name__ == "__main__":

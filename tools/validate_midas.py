@@ -36,6 +36,11 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("bin_file")
     p.add_argument("mid_file")
+    p.add_argument("--event-id", type=int, default=None,
+                   help="validate only events with this event ID. A run file "
+                        "written by mlogger also contains other equipment's "
+                        "events (this project's DQM equipment uses 200), which "
+                        "are not SAMPIC physics events and have no AD00 bank.")
     p.add_argument("--gap-ns", type=float, default=100.0,
                    help="gap used at conversion time (default 100)")
     p.add_argument("--no-timing-bank", action="store_true",
@@ -60,7 +65,10 @@ def main(argv=None) -> int:
     specials = []
     events = []
     for ev in iter_events(args.mid_file, include_special=True):
-        (specials if ev.is_special else events).append(ev)
+        if ev.is_special:
+            specials.append(ev)
+        elif args.event_id is None or ev.event_id == args.event_id:
+            events.append(ev)
 
     check("all events parse cleanly", True,
           f"{len(events)} physics + {len(specials)} special")
