@@ -222,3 +222,5 @@ output/
 *.root
 *.mid 
 *.dat
+# Claude Code local session state
+.claude/
