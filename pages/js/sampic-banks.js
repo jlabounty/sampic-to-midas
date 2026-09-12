@@ -120,6 +120,14 @@ const SAMPIC = (function () {
     };
   }
 
+  // The whole "event -> hits" step in one call, since every page that reads
+  // events wants exactly this. Returns [] for an event with no AD00 bank
+  // rather than throwing, because that is a normal event from other equipment.
+  function hitsOf(event, maxHits) {
+    const bytes = bankBytes(bankByName(event, "AD00"));
+    return bytes ? decodeAD(bytes, maxHits) : [];
+  }
+
   // Sample spacing in ns. 6400 MS/s -> 0.15625 ns, the run914 setting.
   function dtNs(samplingMSps) {
     return 1e3 / (samplingMSps || 6400);
@@ -132,6 +140,7 @@ const SAMPIC = (function () {
     bankBytes: bankBytes,
     decodeAD: decodeAD,
     decodeAT: decodeAT,
+    hitsOf: hitsOf,
     dtNs: dtNs
   };
 })();

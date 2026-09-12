@@ -32,11 +32,10 @@
   const LABEL_H = 11;
 
   let geom = null;
-  let lastHeader = null;
-  let paused = false;
+  let poller = null;
   let yMode = "shared";
-  let inFlight = false;
   let built = false;
+  const STALE_LIMIT_SEC = 5;
   let info = "";
   // channel -> canvas, so an update is a lookup rather than a DOM search.
   const cells = new Map();
@@ -119,8 +118,12 @@
     const bar = SDQM.el("div", "sdqm-controls");
 
     const pause = document.createElement("button");
-    pause.textContent = paused ? "resume" : "pause";
-    pause.onclick = function () { paused = !paused; refreshControls(); };
+    const isPaused = poller ? poller.isPaused() : false;
+    pause.textContent = isPaused ? "resume" : "pause";
+    pause.onclick = function () {
+      if (poller) poller.setPaused(!poller.isPaused());
+      refreshControls();
+    };
     bar.appendChild(pause);
 
     const lbl = SDQM.el("label");
@@ -148,6 +151,13 @@
     bar.appendChild(lbl);
 
     bar.appendChild(SDQM.el("span", "sdqm-muted", info));
+    const age = poller ? poller.ageSec() : null;
+    bar.appendChild(SDQM.statusChip(
+      age === null ? { state: "never", text: "waiting for an event" }
+                   : (age <= STALE_LIMIT_SEC
+                      ? { state: "live", text: "live" }
+                      : { state: "stale",
+                          text: "stale, " + SDQM.ageText(age) + " since last event" })));
     return bar;
   }
 
@@ -261,34 +271,6 @@
     refreshControls();
   }
 
-  function poll() {
-    if (paused || inFlight) return;
-    inFlight = true;
-    // event_id -1 for the same reason as the scope page: mhttpd answers a
-    // specific event_id with status 209 even when matching events exist.
-    const req = {
-      buffer_name: "SYSTEM", event_id: -1, trigger_mask: -1, get_recent: true
-    };
-    if (lastHeader) req.last_event_header = lastHeader;
-
-    mjsonrpc_call("bm_receive_event", req, "arraybuffer").then(function (rpc) {
-      inFlight = false;
-      if (!(rpc instanceof ArrayBuffer)) return;       // no event available
-      const event = bkToObj(rpc);
-      if (!event || event.event_id !== EVENT_ID) return;
-      lastHeader = [event.event_id, event.trigger_mask,
-                    event.serial_number, event.time_stamp];
-      const ad = SAMPIC.bankBytes(SAMPIC.bankByName(event, "AD00"));
-      if (!ad) return;
-      lastHits = SAMPIC.decodeAD(ad);
-      SDQM.setBanner(ROOT, "");
-      render(lastHits);
-    }).catch(function (e) {
-      inFlight = false;
-      SDQM.setBanner(ROOT, "bm_receive_event failed: " + e, "error");
-    });
-  }
-
   window.addEventListener("load", function () {
     mhttpd_init(mhttpd_getParameterByName("page") || "SampicGrid", 1000);
     const wanted = mhttpd_getParameterByName("y");
@@ -302,7 +284,23 @@
       }
       geom = g;
       build();
-      setInterval(poll, 500);
+      poller = SDQM.eventPoller({
+        eventId: EVENT_ID,
+        intervalMs: 500,
+        onEvent: function (event) {
+          const hits = SAMPIC.hitsOf(event);
+          if (!hits.length) return;
+          lastHits = hits;
+          SDQM.setBanner(ROOT, "");
+          render(hits);
+        },
+        onError: function (e) {
+          SDQM.setBanner(ROOT, "bm_receive_event failed: " + e, "error");
+        }
+      });
+      poller.start();
+      // Repaint the chip even when no event arrives, or "stale" never shows.
+      setInterval(refreshControls, 1000);
     });
   });
 })();

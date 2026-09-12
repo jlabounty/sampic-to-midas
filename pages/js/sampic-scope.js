@@ -1,21 +1,15 @@
 // SampicScope: live waveforms straight out of the event buffer.
 //
-// No backend. bm_receive_event pulls the most recent event from SYSTEM and the
+// No backend. SDQM.eventPoller pulls the most recent event from SYSTEM and the
 // AD00 bank is decoded in the browser, so this page works against any
 // experiment where the frontend is running -- nothing has to be analysing or
-// recording.
-//
-// Two things about bm_receive_event worth knowing before changing this:
-//
-//   * get_recent:true asks for the LATEST event rather than the next one in
-//     sequence. A scope should show now, not work through a backlog.
-//   * a JSON reply instead of a binary one means "no event available" (status
-//     209), which is the normal state between events and must not be reported
-//     as an error.
+// recording. The buffer mechanics, including why the request asks for
+// event_id -1 and filters afterwards, live in sampic-common.js and are shared
+// with every other page that reads events.
 //
 // The frontend only produces physics events while a run is active (RO_RUNNING),
-// so an idle page with the run stopped is expected, and the page says so rather
-// than looking broken.
+// so an idle page with the run stopped is expected. The freshness chip says how
+// long it has been rather than leaving a stale event looking current.
 
 (function () {
   "use strict";
@@ -24,21 +18,24 @@
   const EVENT_ID = 1;               // identity.PHYSICS_EVENT_ID
   const MAX_TRACES = 12;
 
-  let lastHeader = null;
+  let poller = null;
   let plot = null;
   let plotCount = -1;
   let geom = null;
-  let paused = false;
   let maxHits = 64;
   let lastEventInfo = "";
-  let inFlight = false;
+  let staleLimitSec = 5;
 
   function controls() {
     const bar = SDQM.el("div", "sdqm-controls");
 
     const pause = document.createElement("button");
-    pause.textContent = paused ? "resume" : "pause";
-    pause.onclick = function () { paused = !paused; draw(null); };
+    const isPaused = poller ? poller.isPaused() : false;
+    pause.textContent = isPaused ? "resume" : "pause";
+    pause.onclick = function () {
+      if (poller) poller.setPaused(!poller.isPaused());
+      draw(null);
+    };
     bar.appendChild(pause);
 
     const lbl = SDQM.el("label");
@@ -55,6 +52,15 @@
     bar.appendChild(lbl);
 
     bar.appendChild(SDQM.el("span", "sdqm-muted", lastEventInfo));
+    // Without this, a dead frontend leaves the last event on screen forever and
+    // the page looks perfectly healthy.
+    const age = poller ? poller.ageSec() : null;
+    bar.appendChild(SDQM.statusChip(
+      age === null ? { state: "never", text: "waiting for an event" }
+                   : (age <= staleLimitSec
+                      ? { state: "live", text: "live" }
+                      : { state: "stale",
+                          text: "stale, " + SDQM.ageText(age) + " since last event" })));
     return bar;
   }
 
@@ -182,50 +188,35 @@
     hitTable(hits);
   }
 
-  function poll() {
-    if (paused || inFlight) return;
-    inFlight = true;
-    // event_id: -1, not EVENT_ID. mhttpd answers a specific event_id with
-    // status 209 ("nothing available") even when matching events are in the
-    // buffer -- verified against midas-2026-07-a -- so ask for anything and
-    // filter below. The buffer also carries this frontend's DQM events, which
-    // is exactly what the event_id check after bkToObj() is for.
-    const req = {
-      buffer_name: "SYSTEM",
-      event_id: -1,
-      trigger_mask: -1,
-      get_recent: true
-    };
-    if (lastHeader) req.last_event_header = lastHeader;
-
-    mjsonrpc_call("bm_receive_event", req, "arraybuffer").then(function (rpc) {
-      inFlight = false;
-      // A JSON reply means no event was available (status 209). Normal between
-      // events and while the run is stopped; not an error.
-      if (!(rpc instanceof ArrayBuffer)) { ensureLayout(); return; }
-      const event = bkToObj(rpc);
-      if (!event || event.event_id !== EVENT_ID) { ensureLayout(); return; }
-      lastHeader = [event.event_id, event.trigger_mask,
-                    event.serial_number, event.time_stamp];
-      const ad = SAMPIC.bankBytes(SAMPIC.bankByName(event, "AD00"));
-      if (!ad) { ensureLayout(); return; }
-      const hits = SAMPIC.decodeAD(ad, maxHits);
-      const at = SAMPIC.decodeAT(SAMPIC.bankBytes(SAMPIC.bankByName(event, "AT00")));
-      lastEventInfo = "serial " + event.serial_number +
-        " · " + (hits.totalHits || hits.length) + " hits" +
-        (at ? " · event t0 " + SDQM.fmt(at.feTimestampNs / 1e6, 3) + " ms" : "");
-      SDQM.setBanner(ROOT, "");
-      draw(hits);
-    }).catch(function (e) {
-      inFlight = false;
-      SDQM.setBanner(ROOT, "bm_receive_event failed: " + e, "error");
-    });
-  }
-
   window.addEventListener("load", function () {
     mhttpd_init(mhttpd_getParameterByName("page") || "SampicScope", 1000);
     ensureLayout();
     SDQM.loadGeometry().then(function (g) { geom = g; });
-    setInterval(poll, 500);
+
+    // The buffer poll lives in SDQM.eventPoller, shared with every other page
+    // that reads events -- it used to be copy-pasted, which is how the
+    // event_id workaround inside it drifts out of sync between pages.
+    poller = SDQM.eventPoller({
+      eventId: EVENT_ID,
+      intervalMs: 500,
+      onEvent: function (event) {
+        const hits = SAMPIC.hitsOf(event, maxHits);
+        if (!hits.length) { ensureLayout(); return; }
+        const at = SAMPIC.decodeAT(SAMPIC.bankBytes(
+          SAMPIC.bankByName(event, "AT00")));
+        lastEventInfo = "serial " + event.serial_number +
+          " \u00b7 " + (hits.totalHits || hits.length) + " hits" +
+          (at ? " \u00b7 event t0 " + SDQM.fmt(at.feTimestampNs / 1e6, 3) + " ms" : "");
+        SDQM.setBanner(ROOT, "");
+        draw(hits);
+      },
+      onIdle: function () { ensureLayout(); },
+      onError: function (e) {
+        SDQM.setBanner(ROOT, "bm_receive_event failed: " + e, "error");
+      }
+    });
+    poller.start();
+    // Repaint the chip even when no event arrives, or "stale" never appears.
+    setInterval(function () { ensureLayout(); }, 1000);
   });
 })();

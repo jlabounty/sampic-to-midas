@@ -69,6 +69,70 @@ you pass `--replace`, and `--remove` only deletes keys that point into it.
 
 Use `--prefix` to install a second copy alongside an existing one.
 
+## Writing a new page
+
+Start from `sampic-grid.js` (event-driven) or `sampic-strips.js` (ODB-driven).
+Both follow the rules below; copy one of them rather than starting blank.
+
+### The checklist
+
+1. **Register it in `install/manifest.py`, nowhere else.** One `Entry` for the
+   HTML (menu, so a dot-free key) and one per new asset (not in the menu, so it
+   keeps its `.js` name). `--check` validates the naming rules for you.
+
+2. **Build the DOM once; update only what changed.** Keep handles to the
+   elements you will rewrite. A page that does `root.innerHTML = ""` on every
+   refresh destroys text selection, focus and any open `<select>` under the
+   user's pointer — every two seconds.
+
+3. **Say whether the data is current.** Use `SDQM.freshness()` with
+   `odbGetFull()`'s `lastWritten`, or `poller.ageSec()` for event pages, and put
+   a `SDQM.statusChip()` somewhere visible. The ODB keeps serving a dead
+   frontend's last value forever; a page that cannot say "this is old" is worse
+   than no page, because the numbers look fine and someone acts on them.
+
+4. **Age the DATA, not your page.** Measure from the event's own `time_stamp` or
+   the ODB's `last_written`, never from when your page received it — a page
+   opened onto a dead experiment receives a stale event immediately and would
+   otherwise call it live. Repeated receipt of the *same* event is not liveness
+   either; `SDQM.eventPoller` handles both.
+
+5. **Read events through `SDQM.eventPoller`.** Do not write another
+   `bm_receive_event` loop: the `event_id` workaround, the `inFlight` guard and
+   the idle-vs-error distinction all live in one place so they cannot drift
+   apart between pages.
+
+6. **Take the geometry from the ODB.** `SDQM.loadGeometry()`. Never hardcode a
+   plane or channel count — the detector this data describes is imaginary and
+   changes with a setting.
+
+7. **Normalise ODB arrays.** A one-element array comes back as a bare scalar;
+   `SDQM.asArray()` exists for that, and it bites the common case, not an
+   exotic one.
+
+8. **Keep the three channel states distinct**: no DAQ channel, mapped but
+   silent, and busy. Collapsing the first two is how a page hides a dead
+   detector.
+
+9. **Bump `?v=` on every asset you edited.** mhttpd stamps a 24 h `Expires`
+   header on dotted `/Custom` keys, so an un-bumped edit simply does not appear.
+
+10. **Render it before believing it.** HTTP 200 means the file was served, not
+    that the page drew anything.
+
+### What lives where
+
+| | |
+|---|---|
+| `sampic-common.js` | ODB access (`odbGet`, `odbGetFull`), geometry, freshness, the event poller, formatting, colour ramp |
+| `sampic-banks.js` | AD00/AT00 decoding: `hitsOf(event)`, `decodeAD`, `decodeAT`, `bankByName`, `bankBytes` |
+| `sampic.css` | only what `midas.css` does not cover |
+| your page | layout and drawing, and as little else as possible |
+
+If you find yourself copying more than a few lines out of another page, it
+belongs in `sampic-common.js` instead. That is how the duplicated
+`bm_receive_event` loop got there.
+
 ## Verifying a page actually renders
 
 Serving HTTP 200 says nothing about whether a page drew anything. Headless
@@ -85,6 +149,20 @@ CHROME="/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
 `<canvas>` inside `sdqm-scope-plot` and a populated hit table mean the whole
 chain worked. This is worth doing after any change to the plotting, because the
 two APIs below are easy to get wrong in ways that fail silently.
+
+**Keep `--virtual-time-budget` small when testing anything clock-based.**
+Virtual time advances the page's `Date.now()` faster than the real clock, so a
+9000 ms budget made a freshness chip report "stale, 9 s old" against data that
+was 1.2 s old. Use ~2500 ms for those checks, or the measurement distorts the
+thing being measured.
+
+To test the stale path, kill the frontend and reload:
+
+```bash
+pkill -u $(id -u) -f '[f]akesampic\.frontend'
+# every page should show an amber "stale" chip and dim its numbers,
+# because the ODB happily keeps serving the last values written
+```
 
 ## Two APIs that fail silently when used wrongly
 

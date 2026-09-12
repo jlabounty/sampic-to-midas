@@ -7,68 +7,92 @@
 // The FSST field order is fixed by fakesampic/frontend.py:DQM_STAT_NAMES and is
 // also published as Settings/Names FSST, which is what this page reads -- so a
 // field added there appears here without touching this file.
+//
+// The tiles are BUILT ONCE and only their values updated. Rebuilding them every
+// two seconds throws away text selection and any focus the user had, and is
+// what this page did originally.
 
 (function () {
   "use strict";
 
   const ROOT = "sdqm-root";
-  let names = null;
 
-  // Fields where a non-zero value means something is wrong, so they can be
-  // coloured without hardcoding their positions.
+  // Fields where a non-zero value means something is wrong, and where a zero
+  // does. Named rather than positional so the FSST layout can grow.
   const BAD_IF_NONZERO = ["Skipped", "Dropped"];
   const WARN_IF_ZERO = ["Source OK"];
 
-  function tile(key, value, cls) {
-    const t = SDQM.el("div", "sdqm-tile" + (cls ? " " + cls : ""));
-    t.appendChild(SDQM.el("div", "k", key));
-    t.appendChild(SDQM.el("div", "v", value));
-    return t;
-  }
+  let built = false;
+  let names = null;
+  const tiles = new Map();          // field name -> value element
+  let elChip = null, elStatus = null, elCommon = null, elTiles = null;
 
-  function render(stats, statusRow, commonRow) {
+  function buildOnce(fieldNames) {
     const root = document.getElementById(ROOT);
     root.innerHTML = "";
-
-    const status = SDQM.el("div", "sdqm-card");
-    status.appendChild(SDQM.el("h3", null, "Generator"));
-    const line = SDQM.el("div", null, statusRow || "(frontend not running)");
-    line.style.fontSize = "14px";
-    status.appendChild(line);
-    if (commonRow) {
-      const sub = SDQM.el("div", "sdqm-muted",
-        "equipment " + SDQM.EQ_REPLAY + " · " + commonRow);
-      status.appendChild(sub);
-    }
-    root.appendChild(status);
+    tiles.clear();
 
     const card = SDQM.el("div", "sdqm-card");
-    card.appendChild(SDQM.el("h3", null, "Statistics"));
-    const tiles = SDQM.el("div", "sdqm-tiles");
-    for (let i = 0; i < stats.length; i++) {
-      const name = (names && names[i]) ? names[i] : "field " + i;
-      const v = stats[i];
-      let cls = "";
-      if (BAD_IF_NONZERO.indexOf(name) >= 0 && v > 0) cls = "bad";
-      if (WARN_IF_ZERO.indexOf(name) >= 0 && v === 0) cls = "warn";
-      let text;
-      if (name === "Events per s" || name === "Hits per s") text = SDQM.fmt(v, 1);
-      else if (name === "MB per s") text = SDQM.fmt(v, 3);
-      else if (name === "Source OK") text = v ? "yes" : "NO";
-      else if (v === Math.round(v)) text = String(Math.round(v));
-      else text = SDQM.fmt(v, 2);
-      tiles.appendChild(tile(name, text, cls));
-    }
-    card.appendChild(tiles);
+    const head = SDQM.el("h3", null, "Generator ");
+    elChip = SDQM.statusChip({ state: "never", text: "no data yet" });
+    head.appendChild(elChip);
+    card.appendChild(head);
+    elStatus = SDQM.el("div", null, "");
+    elStatus.style.fontSize = "14px";
+    card.appendChild(elStatus);
+    elCommon = SDQM.el("div", "sdqm-muted", "");
+    card.appendChild(elCommon);
     root.appendChild(card);
 
-    const hint = SDQM.el("div", "sdqm-muted",
+    const stats = SDQM.el("div", "sdqm-card");
+    stats.appendChild(SDQM.el("h3", null, "Statistics"));
+    elTiles = SDQM.el("div", "sdqm-tiles");
+    fieldNames.forEach(function (name) {
+      const tile = SDQM.el("div", "sdqm-tile");
+      tile.appendChild(SDQM.el("div", "k", name));
+      const v = SDQM.el("div", "v", "-");
+      tile.appendChild(v);
+      elTiles.appendChild(tile);
+      tiles.set(name, { tile: tile, value: v });
+    });
+    stats.appendChild(elTiles);
+    root.appendChild(stats);
+
+    root.appendChild(SDQM.el("div", "sdqm-muted",
       "Rate, source and every other knob live in /Equipment/" + SDQM.EQ_REPLAY +
       "/Settings. Changes to the rate apply within one readout period; changes " +
       "that rebuild the source wait for the next run start unless " +
-      "'Apply Cold Settings' is 'immediately'.");
-    hint.style.marginTop = "10px";
-    root.appendChild(hint);
+      "'Apply Cold Settings' is 'immediately'."));
+    built = true;
+  }
+
+  function format(name, v) {
+    if (name === "Events per s" || name === "Hits per s") return SDQM.fmt(v, 1);
+    if (name === "MB per s") return SDQM.fmt(v, 3);
+    if (name === "Source OK") return v ? "yes" : "NO";
+    if (v === Math.round(v)) return String(Math.round(v));
+    return SDQM.fmt(v, 2);
+  }
+
+  function update(stats, statusText, commonText, fresh) {
+    names.forEach(function (name, i) {
+      const t = tiles.get(name);
+      if (!t) return;
+      const v = stats[i];
+      t.value.textContent = format(name, v);
+      let cls = "sdqm-tile";
+      if (BAD_IF_NONZERO.indexOf(name) >= 0 && v > 0) cls += " bad";
+      if (WARN_IF_ZERO.indexOf(name) >= 0 && v === 0) cls += " warn";
+      t.tile.className = cls;
+    });
+    elStatus.textContent = statusText || "(frontend not running)";
+    elCommon.textContent = commonText || "";
+    // Old numbers are dimmed rather than hidden: the last known state is still
+    // useful, but it must not read as the current one.
+    elTiles.classList.toggle("sdqm-stale-data", fresh.state !== "live");
+    const chip = SDQM.statusChip(fresh);
+    elChip.replaceWith(chip);
+    elChip = chip;
   }
 
   function refresh() {
@@ -78,21 +102,31 @@
       "/Equipment/" + SDQM.EQ_REPLAY + "/Statistics/Events per sec.",
       "/Equipment/" + SDQM.EQ_REPLAY + "/Statistics/kBytes per sec.",
       "/Equipment/" + SDQM.EQ_REPLAY + "/Common/Period",
-      SDQM.DQM_SETTINGS + "/Names FSST"
+      SDQM.DQM_SETTINGS + "/Names FSST",
+      "/Equipment/" + SDQM.EQ_DQM + "/Common/Period"
     ];
-    SDQM.odbGet(paths).then(function (d) {
+    SDQM.odbGetFull(paths).then(function (r) {
+      const d = r.data;
       if (d[0] === null || d[0] === undefined) {
         SDQM.setBanner(ROOT,
           "No " + SDQM.EQ_DQM + " data in the ODB. Start the frontend with " +
           "scripts/start-frontend.sh.", "warn");
         return;
       }
-      names = SDQM.asArray(d[5]).map(String);
-      const stats = SDQM.asArray(d[0]).map(Number);
+      SDQM.setBanner(ROOT, "");
+      const fieldNames = SDQM.asArray(d[5]).map(String);
+      if (!built || (names && names.join() !== fieldNames.join())) {
+        names = fieldNames;
+        buildOnce(fieldNames);
+      }
+      names = fieldNames;
+
+      const dqmPeriod = SDQM.num(d[6], 2000) / 1000;
       const common = "MIDAS reports " + SDQM.fmt(SDQM.num(d[2]), 1) + " ev/s, " +
                      SDQM.fmt(SDQM.num(d[3]), 1) + " kB/s · readout tick " +
                      SDQM.num(d[4]) + " ms";
-      render(stats, d[1], common);
+      update(SDQM.asArray(d[0]).map(Number), d[1], common,
+             SDQM.freshness(r.lastWritten[0], Math.max(dqmPeriod * 2.5, 3)));
     }).catch(function (e) {
       SDQM.setBanner(ROOT, "ODB read failed: " + e, "error");
     });

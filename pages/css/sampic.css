@@ -64,3 +64,12 @@ table.sdqm td.name, table.sdqm th.name { text-align: left; }
 .sdqm-grid-cell { line-height: 0; }
 .sdqm-grid-cell canvas { border: 1px solid #dcdce3; border-radius: 2px;
                          display: block; }
+
+/* Freshness chip: the same three states on every page */
+.sdqm-chip { display: inline-block; padding: 1px 8px; border-radius: 10px;
+             font-size: 11px; font-weight: 600; letter-spacing: .02em;
+             border: 1px solid transparent; vertical-align: middle; }
+.sdqm-chip.live  { background: #e6f4ea; color: #1c6b34; border-color: #b7dfc4; }
+.sdqm-chip.stale { background: #fdf3e3; color: #96601a; border-color: #ecd3a6; }
+.sdqm-chip.never { background: #f0f0f3; color: #61626a; border-color: #dcdce3; }
+.sdqm-stale-data { opacity: .55; }
