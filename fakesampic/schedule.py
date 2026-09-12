@@ -304,6 +304,10 @@ class Pacer:
         if policy == "drop" and self._queue.size:
             self.stats.dropped += int(self._queue.size)
             self._queue = np.empty(0, dtype=np.float64)
+            # Keep the published backlog in step. It is read by the DQM bank
+            # between due() calls, so leaving it stale would show a queue that
+            # has already been discarded.
+            self.stats.backlog = 0
         self.policy = policy
 
     def due(self, t_sim_ns: float, max_n: int) -> np.ndarray:

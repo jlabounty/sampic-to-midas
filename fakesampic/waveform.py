@@ -10,10 +10,17 @@ The per-hit `baseline` and `amplitude` scalars are then measured back off the
 QUANTISED samples rather than being the values we asked for. The AD00 bank
 carries both the waveform and these scalars, and `build_ad_records` computes
 `peak = baseline + amplitude` (sampic_banks.py:93); deriving them from the
-samples makes the three agree exactly, the way a real reconstruction of a real
-waveform would. Writing the requested values instead would leave a consistent
-mismatch for anyone who checked, which is the sort of thing that costs an
-afternoon.
+samples makes the three agree to within one float32 ULP (~6e-8 V), the way a
+real reconstruction of a real waveform would. They are NOT bit-identical: the
+scalars are computed in float64 and stored as float32, so `baseline + amplitude`
+rounds slightly differently from `max(waveform)`. Writing the REQUESTED values
+instead would leave a mismatch of order the noise amplitude, which is the sort
+of thing that costs an afternoon.
+
+Note real SAMPIC data does not have this property at all: the board reports its
+own fitted amplitude and baseline, and measured across run914 the difference
+from max(waveform) runs to -24 mV. So a consistency check like this is a test of
+SYNTHETIC hits only.
 
 Pulse shape is the standard two-exponential
     f(t) = (1 - exp(-t/rise)) * exp(-t/fall),  t >= 0
