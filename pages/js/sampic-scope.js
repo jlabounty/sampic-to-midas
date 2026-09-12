@@ -26,6 +26,7 @@
 
   let lastHeader = null;
   let plot = null;
+  let plotCount = -1;
   let geom = null;
   let paused = false;
   let maxHits = 64;
@@ -95,10 +96,16 @@
     host.appendChild(SDQM.el("h3", null,
       "Hits in this event (" + hits.length + " shown of " +
       (hits.totalHits || hits.length) + ")"));
+    // t0 is shown RELATIVE to the first hit of the event. The absolute value is
+    // ~5e9 ns into the run, so every row would read "4.93e+09" and the
+    // sub-nanosecond spread between planes -- the only interesting part, and
+    // the thing a timing page is built on -- would be invisible. The absolute
+    // event time is in the header line above the plot.
+    const t0Ref = hits.length ? hits[0].t0 : 0;
     const t = document.createElement("table");
     t.className = "sdqm";
     const head = document.createElement("tr");
-    ["channel", "plane / strip", "t0 (ns)", "amplitude (V)", "baseline (V)", "samples"]
+    ["channel", "plane / strip", "\u0394t0 (ns)", "amplitude (V)", "baseline (V)", "samples"]
       .forEach(function (h, i) {
         const th = SDQM.el("th", i < 2 ? "name" : null, h);
         head.appendChild(th);
@@ -109,7 +116,7 @@
       const cells = [
         [String(h.channel), "name"],
         [label(h), "name"],
-        [SDQM.fmt(h.t0, 3), null],
+        [(h.t0 - t0Ref).toFixed(3), null],
         [SDQM.fmt(h.amplitude, 4), null],
         [SDQM.fmt(h.baseline, 4), null],
         [String(h.dataSize), null]
@@ -120,23 +127,58 @@
     host.appendChild(t);
   }
 
+  // MPlotGraph's real API (midas/resources/mplot.js):
+  //     new MPlotGraph(divElement, figureParams)   <- an ELEMENT, not an id
+  //     graph.addPlot({label, xData, yData, line:{...}, marker:{...}})
+  //     graph.setData(index, x, y, z)              <- redraws
+  // There is no addPlot(x, y, label) and no draw(); getting this wrong draws
+  // nothing and reports nothing.
+  //
+  // The graph is rebuilt whenever the trace count changes and only re-fed
+  // otherwise. Rebuilding every event would also work at this refresh rate, but
+  // it discards the user's zoom/pan on every tick, which makes the page useless
+  // for actually looking at a pulse.
   function draw(hits) {
     ensureLayout();
     if (!hits) return;
+    const host = document.getElementById("sdqm-scope-plot");
+    if (!host) return;
+
     const shown = hits.slice(0, MAX_TRACES);
-    if (!plot) {
-      plot = new MPlotGraph("sdqm-scope-plot");
-      plot.showZeroSuppression = false;
-      plot.xLabel = "sample";
-      plot.yLabel = "volts";
-    }
-    plot.deletePlot(-1);
-    shown.forEach(function (h, i) {
-      const xs = [], ys = [];
-      for (let s = 0; s < h.waveform.length; s++) { xs.push(s); ys.push(h.waveform[s]); }
-      plot.addPlot(xs, ys, label(h));
+    const series = shown.map(function (h) {
+      const xs = new Array(h.waveform.length);
+      const ys = new Array(h.waveform.length);
+      for (let s = 0; s < h.waveform.length; s++) { xs[s] = s; ys[s] = h.waveform[s]; }
+      return { label: label(h), xData: xs, yData: ys };
     });
-    plot.draw();
+
+    if (!plot || plotCount !== series.length) {
+      host.innerHTML = "";
+      plot = new MPlotGraph(host, {
+        title: { text: "" },
+        legend: { show: true },
+        stats: { show: false },
+        xAxis: { title: { text: "sample" } },
+        yAxis: { title: { text: "volts" } }
+      });
+      host.mpg = plot;
+      series.forEach(function (sr) {
+        plot.addPlot({
+          label: sr.label, xData: sr.xData, yData: sr.yData,
+          // A 64-sample trace with circular markers is unreadable; the line is
+          // the signal.
+          marker: { draw: false },
+          line: { width: 1 }
+        });
+      });
+      plotCount = series.length;
+      if (typeof plot.resize === "function") plot.resize();
+    } else {
+      series.forEach(function (sr, i) {
+        plot.param.plot[i].label = sr.label;
+        plot.setData(i, sr.xData, sr.yData);
+      });
+    }
     hitTable(hits);
   }
 

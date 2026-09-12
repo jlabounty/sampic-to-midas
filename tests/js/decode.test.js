@@ -93,6 +93,34 @@ check("rejects a truncated payload",
       SAMPIC.decodeAD(adBytes.slice(0, 100)).length === 0);
 check("handles an empty payload", SAMPIC.decodeAD(new Uint8Array(0)).length === 0);
 
+// --- the shape bkToObj() actually returns -----------------------------------
+//
+// midas.js puts the banks in `event.bank` -- an ARRAY of
+// {name, type, size, data, hexdata, array} -- not `event.banks`, and not keyed
+// by name. Reading the wrong property finds no AD00, draws nothing, and reports
+// no error anywhere, which is exactly how the scope page first shipped empty.
+const bkToObjShaped = {
+  event_id: 1,
+  bank: [
+    { name: "AD00", type: 1, size: ad.byteLength,
+      data: ad.buffer.slice(ad.byteOffset, ad.byteOffset + ad.byteLength),
+      hexdata: adBytes, array: adBytes },
+    { name: "AT00", type: 1, size: at.byteLength,
+      data: at.buffer.slice(at.byteOffset, at.byteOffset + at.byteLength),
+      hexdata: atBytes, array: atBytes }
+  ]
+};
+const foundAd = SAMPIC.bankByName(bkToObjShaped, "AD00");
+check("bankByName finds a bank in bkToObj's event.bank array", foundAd !== null);
+check("bankByName returns null for a bank that is absent",
+      SAMPIC.bankByName(bkToObjShaped, "DRSV") === null);
+const viaBank = SAMPIC.decodeAD(SAMPIC.bankBytes(foundAd));
+check("decoding through bankByName/bankBytes matches decoding the payload",
+      viaBank.length === expect.nHits &&
+      closeEnough(viaBank.map(h => h.amplitude), expect.amplitude, 1e-9));
+check("bankBytes prefers hexdata and yields the exact payload length",
+      SAMPIC.bankBytes(foundAd).length === ad.byteLength);
+
 console.log(failures === 0 ? "\nALL JS CHECKS PASSED"
                            : "\n" + failures + " JS CHECK(S) FAILED");
 process.exit(failures === 0 ? 0 : 1);

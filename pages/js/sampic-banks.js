@@ -30,19 +30,29 @@ const SAMPIC = (function () {
   const SCALAR_OFFSET = 300;
   const LITTLE_ENDIAN = true;
 
+  // bkToObj() (midas.js) returns the banks as `event.bank`, an ARRAY of
+  // {name, type, size, data, hexdata, array} -- not `event.banks`, and not
+  // keyed by name. Getting that wrong means never finding AD00 and drawing
+  // nothing, with no error anywhere.
   function bankByName(event, name) {
-    if (!event || !event.banks) return null;
-    // bkToObj() returns banks keyed by name; be tolerant of either shape.
-    if (Array.isArray(event.banks)) {
-      for (const b of event.banks) if (b.name === name) return b;
+    if (!event) return null;
+    const list = event.bank || event.banks;
+    if (!list) return null;
+    if (Array.isArray(list)) {
+      for (const b of list) if (b.name === name) return b;
       return null;
     }
-    return event.banks[name] || null;
+    return list[name] || null;
   }
 
+  // `hexdata` is always a Uint8Array over the bank payload, whatever the TID;
+  // `array` is typed by TID and `data` is a raw ArrayBuffer. Prefer hexdata so
+  // a bank that is bytes-on-the-wire is read as bytes regardless of how midas.js
+  // chose to interpret its type.
   function bankBytes(bank) {
     if (!bank) return null;
-    const d = bank.array !== undefined ? bank.array : bank.data;
+    const d = (bank.hexdata !== undefined) ? bank.hexdata
+            : (bank.array !== undefined) ? bank.array : bank.data;
     if (!d) return null;
     if (d instanceof Uint8Array) return d;
     if (d instanceof ArrayBuffer) return new Uint8Array(d);

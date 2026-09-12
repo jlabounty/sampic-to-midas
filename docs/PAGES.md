@@ -44,6 +44,39 @@ you pass `--replace`, and `--remove` only deletes keys that point into it.
 
 Use `--prefix` to install a second copy alongside an existing one.
 
+## Verifying a page actually renders
+
+Serving HTTP 200 says nothing about whether a page drew anything. Headless
+Chrome does, and WSL can use the Windows install:
+
+```bash
+CHROME="/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
+"$CHROME" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=9000 \
+    --dump-dom "http://localhost:8080/?cmd=custom&page=SampicScope"
+# or --screenshot='C:\Users\<you>\AppData\Local\Temp\shot.png' --window-size=1400,1000
+```
+
+`--dump-dom` after a virtual-time budget shows the DOM the page built: a
+`<canvas>` inside `sdqm-scope-plot` and a populated hit table mean the whole
+chain worked. This is worth doing after any change to the plotting, because the
+two APIs below are easy to get wrong in ways that fail silently.
+
+## Two APIs that fail silently when used wrongly
+
+**`MPlotGraph` takes an ELEMENT and a params object**, not an id string, and its
+methods are `addPlot({label, xData, yData, line, marker})` and
+`setData(index, x, y, z)`. There is no `addPlot(x, y, label)` and no `draw()`.
+Calling the wrong thing throws inside a promise handler and the page simply
+stays empty. See `midas/resources/mplot.html` for a worked example and
+`defaultGraphParam` / `defaultPlotParam` in `mplot.js` for every parameter name.
+
+**`bkToObj()` returns `event.bank`** — an array of
+`{name, type, size, data, hexdata, array}` — **not `event.banks`**, and not keyed
+by name. `hexdata` is a `Uint8Array` over the payload whatever the TID, which is
+what `SAMPIC.bankBytes` prefers. Reading the wrong property finds no AD00 and
+draws nothing, with no error anywhere. `tests/js/decode.test.js` pins both the
+property name and the decode-through-`bankByName` path.
+
 ## Two mhttpd rules that shaped the pages
 
 **A menu key must not contain a dot.** A dot-less key is served by
