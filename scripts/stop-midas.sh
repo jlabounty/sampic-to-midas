@@ -38,8 +38,11 @@ fs_stop() {
     return 0
 }
 
-fs_stop "frontend" "python.* -m fakesampic\.frontend"
-fs_stop "analyzer" "python.* -m fakesampic\.analyzer"
+# PLAIN SUBSTRINGS, not regexes: fs_pids_matching does a shell glob compare
+# against the command line, so a pattern like "python.* -m fakesampic" matches
+# nothing at all -- and silently, leaving the process running.
+fs_stop "frontend" "fakesampic.frontend"
+fs_stop "analyzer" "fakesampic.analyzer"
 fs_stop "mlogger"  "mlogger -e $FS_EXPT_NAME"
 fs_stop "mhttpd"   "mhttpd -e $FS_EXPT_NAME"
 

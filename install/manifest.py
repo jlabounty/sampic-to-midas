@@ -61,6 +61,11 @@ ENTRIES: Tuple[Entry, ...] = (
           "generator rate, health and backlog (no backend)"),
     Entry("SampicGrid", "sampic-grid.html", True,
           "one event as the detector: a waveform per plane/strip cell"),
+    Entry("SampicHistos", "sampic-histos.html", True,
+          "accumulated histograms (NEEDS the analyzer backend)"),
+    Entry("SampicPersist", "sampic-persist.html", True,
+          "last N waveforms per channel, vs the canonical pulse shape "
+          "(NEEDS the analyzer backend)"),
     Entry("sampic-common.js", "js/sampic-common.js", False,
           "shared ODB/geometry helpers"),
     Entry("sampic-banks.js", "js/sampic-banks.js", False,
@@ -69,6 +74,12 @@ ENTRIES: Tuple[Entry, ...] = (
     Entry("sampic-strips.js", "js/sampic-strips.js", False, "strip map page"),
     Entry("sampic-rates.js", "js/sampic-rates.js", False, "rates page"),
     Entry("sampic-grid.js", "js/sampic-grid.js", False, "waveform grid page"),
+    Entry("sampic-brpc.js", "js/sampic-brpc.js", False,
+          "binary protocol to the analyzer backend"),
+    Entry("sampic-h2d.js", "js/sampic-h2d.js", False,
+          "2-D histogram renderer (ImageData, not per-bin fillRect)"),
+    Entry("sampic-histos.js", "js/sampic-histos.js", False, "histogram browser page"),
+    Entry("sampic-persist.js", "js/sampic-persist.js", False, "persistence grid page"),
     Entry("sampic.css", "css/sampic.css", False, "the little midas.css does not cover"),
 )
 

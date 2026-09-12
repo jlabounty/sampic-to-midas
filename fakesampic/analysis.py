@@ -30,7 +30,8 @@ class SampicAnalysis:
     def __init__(self, geometry=None, n_channels: int = 128,
                  persistence_depth: int = 20, n_samples: int = 64,
                  template: Optional[PulseTemplate] = None,
-                 amp_max_v: float = 0.20, template_window: int = 12):
+                 amp_max_v: float = 0.20, template_window: int = 12,
+                 per_strip: bool = True):
         self.geometry = geometry
         self.n_channels = int(n_channels)
         self.n_samples = int(n_samples)
@@ -61,6 +62,31 @@ class SampicAnalysis:
             s.add(Hist1D(f"amp/plane_{name}", 200, 0.0, amp_max_v,
                          xlabel="amplitude [V]", title=f"Pulse amplitude, plane {name}"))
 
+        # Per-strip histograms. A plane-level amplitude spectrum is the SUM of
+        # ten strips that see quite different things -- the centre strip of a
+        # cluster and its neighbours differ by an order of magnitude -- so the
+        # aggregate is a mixture whose shape says little about any one channel,
+        # and a single sick strip is invisible in it. The aggregates are kept as
+        # an overview; these are what you look at when something is wrong.
+        #
+        # Cost: three 200-bin float64 histograms per mapped channel is ~5 kB
+        # each, so ~1.2 MB for an 80-strip detector. Cheap.
+        self.per_strip = bool(per_strip) and geometry is not None
+        self._strip_names = {}
+        if self.per_strip:
+            for ch in geometry.mapped_channels:
+                ch = int(ch)
+                pi = int(geometry.channel_plane[ch])
+                st = int(geometry.channel_strip[ch])
+                label = f"{geometry.planes[pi].name}_s{st:02d}"
+                self._strip_names[ch] = label
+                s.add(Hist1D(f"amp/strip/{label}", 200, 0.0, amp_max_v,
+                             xlabel="amplitude [V]",
+                             title=f"Pulse amplitude, {label} (ch {ch})"))
+                s.add(Hist1D(f"baseline/strip/{label}", 200, 0.0, 1.5,
+                             xlabel="baseline [V]",
+                             title=f"Baseline, {label} (ch {ch})"))
+
         s.add(Hist2D("occ/plane_vs_strip", n_strips, 0, n_strips, n_planes, 0, n_planes,
                      xlabel="strip", ylabel="plane", title="Occupancy, plane vs strip"))
         # The classic persistence display: every sample of every hit, stacked.
@@ -81,6 +107,12 @@ class SampicAnalysis:
         self.store.add(Hist2D("shape/rms_vs_amp", 100, 0.0, amp_max_v, 100, 0.0, 0.5,
                               xlabel="amplitude [V]", ylabel="rms vs template",
                               title="Shape deviation vs amplitude"))
+        # Per strip too: a channel whose PULSE SHAPE has gone wrong is exactly
+        # what this measures, and which channel it is matters.
+        for ch, label in getattr(self, "_strip_names", {}).items():
+            self.store.add(Hist1D(f"shape/strip/{label}", 200, 0.0, 0.5,
+                                  xlabel="rms deviation [fraction of peak]",
+                                  title=f"Shape deviation, {label} (ch {ch})"))
 
     def set_template(self, template: Optional[PulseTemplate]) -> None:
         """Swap the canonical shape at runtime, adding its histograms if new."""
@@ -142,6 +174,26 @@ class SampicAnalysis:
             s.get("shape/template_rms").fill(rms)
             s.get("shape/rms_vs_amp").fill(amp, rms)
 
+        # Per-strip fills. Grouped by channel with np.unique so each histogram
+        # takes one vectorised fill rather than one per hit -- an event touching
+        # 24 strips does 24 fills, not 24 python-level loops over single values.
+        if self.per_strip:
+            for ch in np.unique(channels):
+                label = self._strip_names.get(int(ch))
+                if label is None:
+                    continue
+                m = channels == ch
+                h = s.get(f"amp/strip/{label}")
+                if h is not None:
+                    h.fill(amp[m])
+                h = s.get(f"baseline/strip/{label}")
+                if h is not None:
+                    h.fill(base[m])
+                if self.template is not None:
+                    h = s.get(f"shape/strip/{label}")
+                    if h is not None:
+                        h.fill(rms[m])
+
     def reset(self) -> None:
         self.store.reset_all()
         self.events = 0
@@ -154,6 +206,7 @@ class SampicAnalysis:
             "events": self.events,
             "hits": self.hits,
             "histograms": len(self.store),
+            "per_strip": self.per_strip,
             "n_channels": self.n_channels,
             "persistence_depth": (self.store.persistence.depth
                                   if self.store.persistence else 0),

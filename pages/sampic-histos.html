@@ -1,0 +1,31 @@
+<!--
+  SAMPIC Histograms -- needs the analyzer backend (scripts/start-analyzer.sh).
+
+  Stock MIDAS resources are loaded by bare name so mhttpd serves its own copies;
+  ours carry a ?v= cache-buster, because mhttpd stamps a 24 h Expires header on
+  any /Custom file whose key contains a dot. Bump ?v= when editing.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SAMPIC Histograms</title>
+  <link rel="stylesheet" href="midas.css">
+  <script src="controls.js"></script>
+  <script src="midas.js"></script>
+  <script src="mhttpd.js"></script>
+  <script src="mplot.js"></script>
+  <link rel="stylesheet" href="sampic.css?v=3">
+  <script src="sampic-common.js?v=4"></script>
+  <script src="sampic-brpc.js?v=1"></script>
+  <script src="sampic-h2d.js?v=1"></script>
+  <script src="sampic-histos.js?v=5"></script>
+</head>
+<body class="mcss">
+  <div id="mheader"></div>
+  <div id="msidenav"></div>
+  <div id="mmain">
+    <div id="sdqm-root"></div>
+  </div>
+</body>
+</html>

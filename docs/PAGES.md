@@ -15,6 +15,11 @@ buffer directly, so they work whenever the frontend is running.
 | **SampicStrips** | `FakeSampicDQM` Variables + Settings | the detector as a picture: one row per plane, one cell per strip, coloured by rate or amplitude |
 | **SampicRates** | `FSST` + equipment Statistics | generator rate, backlog, drops, readout duty, loops |
 | **SampicGrid** | `bm_receive_event` + geometry | one event laid out as the detector: a waveform per plane/strip cell |
+| **SampicHistos** | analyzer, over `brpc` | accumulated histograms, 1-D and 2-D — **needs the backend** |
+| **SampicPersist** | analyzer, over `brpc` | the last N waveforms per channel, against the canonical pulse shape — **needs the backend** |
+
+The last two need `scripts/start-analyzer.sh`; see [ANALYZER.md](ANALYZER.md).
+Everything else works with just the frontend.
 
 ## SampicGrid and the y-range toggle
 
@@ -120,12 +125,21 @@ Both follow the rules below; copy one of them rather than starting blank.
 10. **Render it before believing it.** HTTP 200 means the file was served, not
     that the page drew anything.
 
+11. **If the page needs the analyzer, say so when it is missing.** A backend
+    page must degrade to a clear "start the analyzer" message, not to an empty
+    plot — and `SBRPC.call` already turns a non-binary reply into that error.
+
+12. **Draw big 2-D data as an image** (`SH2D.draw`), not as one rectangle per
+    bin. See below.
+
 ### What lives where
 
 | | |
 |---|---|
 | `sampic-common.js` | ODB access (`odbGet`, `odbGetFull`), geometry, freshness, the event poller, formatting, colour ramp |
 | `sampic-banks.js` | AD00/AT00 decoding: `hitsOf(event)`, `decodeAD`, `decodeAT`, `bankByName`, `bankBytes` |
+| `sampic-brpc.js` | the binary protocol to the analyzer; mirrors `fakesampic/framing.py` |
+| `sampic-h2d.js` | 2-D histograms as ImageData — see below |
 | `sampic.css` | only what `midas.css` does not cover |
 | your page | layout and drawing, and as little else as possible |
 
@@ -163,6 +177,27 @@ pkill -u $(id -u) -f '[f]akesampic\.frontend'
 # every page should show an amber "stale" chip and dim its numbers,
 # because the ODB happily keeps serving the last values written
 ```
+
+## Draw a density map as an image, not as rectangles
+
+`MPlotGraph`'s colormap fills one rectangle per bin and builds a CSS colour
+string for each, so a 64×220 persistence map costs 14,080 string allocations and
+14,080 `fillStyle` parses **per redraw** — and it redraws on every refresh and
+every mouse move. Measured on this machine: **7.18 ms per paint**, which is what
+makes the page lag. `sampic-h2d.js` writes the density straight into an
+`ImageData`, blits it once with smoothing off, and takes **0.49 ms — 14.8×
+faster**. `MPlotGraph` is still the right tool for 1-D, where 200 points cost
+nothing.
+
+JSROOT would also do this well, and would be the right call if ROOT-style
+fitting, projections and stats boxes were wanted. For drawing a density map it
+is a megabyte-plus dependency that MIDAS does not ship, on machines that are
+often offline.
+
+Two mplot details worth knowing if you extend this: `redraw()` only schedules
+`draw()` via `requestAnimationFrame` (so timing `redraw()` in a loop measures
+nothing), and a colormap takes `xMin/xMax/yMin/yMax` on the **plot** parameters
+— given only the figure's axis range it silently plots in bin indices.
 
 ## Two APIs that fail silently when used wrongly
 

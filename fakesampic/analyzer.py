@@ -59,6 +59,7 @@ DEFAULTS = {
     "Template Window": 12,
     "Amplitude Max V": 0.20,
     "Reset At BOR": True,
+    "Per Strip Histograms": True,
 }
 
 
@@ -87,8 +88,17 @@ class SampicAnalyzer:
         Seeded with remove_unspecified_keys=False so an operator's extra key or
         a setting from a newer version is left alone rather than deleted.
         """
-        if not self.client.odb_exists(ODB_DIR):
-            self.client.odb_set(ODB_DIR, DEFAULTS, remove_unspecified_keys=False)
+        # update_structure_only ADDS keys that are missing without touching the
+        # values of keys that exist, so a setting introduced in a later version
+        # appears in an experiment whose ODB predates it. Seeding only when the
+        # whole subtree was absent -- which this did originally -- meant a new
+        # setting silently never appeared, and toggling it in mhttpd did
+        # nothing because there was nothing to toggle.
+        #
+        # remove_unspecified_keys=False so an operator's extra key, or one from
+        # a newer version, is left alone rather than deleted.
+        self.client.odb_set(ODB_DIR, DEFAULTS, remove_unspecified_keys=False,
+                            update_structure_only=True)
         stored = self.client.odb_get(ODB_DIR, recurse_dir=True) or {}
         merged = dict(DEFAULTS)
         merged.update({k: v for k, v in stored.items() if k in DEFAULTS})
@@ -124,7 +134,8 @@ class SampicAnalyzer:
             persistence_depth=int(self.settings["Persistence Depth"]),
             template=self.load_template(),
             amp_max_v=float(self.settings["Amplitude Max V"]),
-            template_window=int(self.settings["Template Window"]))
+            template_window=int(self.settings["Template Window"]),
+            per_strip=bool(self.settings["Per Strip Histograms"]))
 
     def read_geometry(self):
         """Rebuild the frontend's geometry from what it published.
@@ -284,7 +295,7 @@ class SampicAnalyzer:
             # Rebuild only for the settings that change the shape of the
             # accumulators; a rate-limit change must not throw away the plots.
             for key in ("Persistence Depth", "Template File", "Amplitude Max V",
-                        "Template Window"):
+                        "Template Window", "Per Strip Histograms"):
                 if before.get(key) != self.settings.get(key):
                     self.client.msg(f"sampic-analyzer: '{key}' changed, rebuilding")
                     self.build()
@@ -313,8 +324,12 @@ def main() -> int:
     client.msg(f"sampic-analyzer: watching {identity.BUFFER_NAME}, "
                f"{len(analyzer.analysis.store)} histograms, brpc ready")
 
+    # `client.communicate()` handles the shutdown RPC itself -- it disconnects
+    # and exits the process on RPC_SHUTDOWN (client.py:286) -- so this loop has
+    # no termination condition of its own and must not invent one. Ctrl-C is the
+    # only other way out.
     try:
-        while not client.shutdown_requested:
+        while True:
             analyzer.poll_run_state()
             got = 0
             while got < 500:
@@ -328,8 +343,14 @@ def main() -> int:
             # Yield briefly when the buffer was empty; spinning would burn a core
             # for nothing between events.
             client.communicate(10 if got == 0 else 0)
+    except KeyboardInterrupt:
+        client.msg("sampic-analyzer: stopping on Ctrl-C")
     finally:
-        client.disconnect()
+        try:
+            client.disconnect()
+        except Exception:
+            # Already disconnected by communicate()'s shutdown path.
+            pass
     return 0
 
 

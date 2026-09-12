@@ -1,0 +1,115 @@
+{
+ "pids": {
+  "mhttpd": 73651,
+  "mlogger": 74418,
+  "frontend": 75207,
+  "analyzer": 75619
+ },
+ "results": [
+  {
+   "page": "(idle)",
+   "tabs": 0,
+   "seconds": 20.0,
+   "calls_per_s": 0.0,
+   "kB_per_s": 0.0,
+   "kB_per_refresh": 0.0,
+   "cpu": {
+    "analyzer": 23.6,
+    "frontend": 7.55,
+    "mhttpd": 0.55,
+    "mlogger": 0.05
+   },
+   "errors": 0
+  },
+  {
+   "page": "SampicGrid",
+   "tabs": 1,
+   "seconds": 20.0,
+   "calls_per_s": 2.0,
+   "kB_per_s": 15.7,
+   "kB_per_refresh": 7.8,
+   "cpu": {
+    "analyzer": 0.05,
+    "frontend": 0.0,
+    "mhttpd": 0.15,
+    "mlogger": 0.05
+   },
+   "errors": 0
+  },
+  {
+   "page": "SampicHistos",
+   "tabs": 1,
+   "seconds": 20.0,
+   "calls_per_s": 1.05,
+   "kB_per_s": 21.1,
+   "kB_per_refresh": 20.1,
+   "cpu": {
+    "analyzer": -0.15,
+    "frontend": -0.1,
+    "mhttpd": 0.05,
+    "mlogger": 0.0
+   },
+   "errors": 0
+  },
+  {
+   "page": "SampicPersist",
+   "tabs": 1,
+   "seconds": 20.0,
+   "calls_per_s": 1.0,
+   "kB_per_s": 100.7,
+   "kB_per_refresh": 100.7,
+   "cpu": {
+    "analyzer": 0.1,
+    "frontend": -0.15,
+    "mhttpd": 0.15,
+    "mlogger": 0.05
+   },
+   "errors": 0
+  },
+  {
+   "page": "SampicRates",
+   "tabs": 1,
+   "seconds": 20.0,
+   "calls_per_s": 0.5,
+   "kB_per_s": 0.3,
+   "kB_per_refresh": 0.6,
+   "cpu": {
+    "analyzer": 0.4,
+    "frontend": -0.1,
+    "mhttpd": 0.05,
+    "mlogger": 0.0
+   },
+   "errors": 0
+  },
+  {
+   "page": "SampicScope",
+   "tabs": 1,
+   "seconds": 20.0,
+   "calls_per_s": 2.0,
+   "kB_per_s": 16.0,
+   "kB_per_refresh": 8.0,
+   "cpu": {
+    "analyzer": -0.2,
+    "frontend": -0.05,
+    "mhttpd": 0.2,
+    "mlogger": 0.05
+   },
+   "errors": 0
+  },
+  {
+   "page": "SampicStrips",
+   "tabs": 1,
+   "seconds": 20.0,
+   "calls_per_s": 0.5,
+   "kB_per_s": 0.7,
+   "kB_per_refresh": 1.5,
+   "cpu": {
+    "analyzer": -0.4,
+    "frontend": -0.1,
+    "mhttpd": 0.05,
+    "mlogger": 0.05
+   },
+   "errors": 0
+  }
+ ]
+}
