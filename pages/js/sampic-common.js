@@ -187,8 +187,9 @@ const SDQM = (function () {
   // --- event polling ------------------------------------------------------
 
   // One implementation of "give me the newest event from the buffer", shared by
-  // every page that reads events. It was copy-pasted between two pages before
-  // this existed, which is how the event_id workaround below drifts out of sync.
+  // every page that reads events. Kept in one place so the event_id workaround
+  // below, the inFlight guard and the idle-vs-error distinction cannot drift
+  // apart between pages.
   //
   //   const poller = SDQM.eventPoller({ eventId: 1, onEvent: fn });
   //   poller.start();  poller.setPaused(true);  poller.stop();

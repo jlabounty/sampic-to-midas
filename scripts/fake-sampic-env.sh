@@ -87,11 +87,10 @@ fs_require_python() {
 # Find our own running daemons.
 #
 # NOT `pgrep -f`, which matches whole command lines and therefore matches any
-# shell whose command line happens to mention the program -- including the shell
-# calling this function, and including an unrelated terminal running
-# `tail -f mhttpd.log`. During development that made start-midas.sh report
-# "mhttpd already running" when no mhttpd existed at all, and made stop-midas.sh
-# kill its own caller.
+# shell whose command line happens to mention the program -- the shell calling
+# this function included, and an unrelated terminal running `tail -f mhttpd.log`
+# too. That makes "is it running?" answer yes when nothing is running, and makes
+# "stop it" kill the caller.
 #
 # Walk /proc instead, skip anything whose executable is a shell or a process
 # tool, and match the rest on their command line. A daemon of ours is never

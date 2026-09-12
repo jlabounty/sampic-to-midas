@@ -1,5 +1,7 @@
 # Running the fake SAMPIC experiment
 
+> First time? [GETTING-STARTED.md](GETTING-STARTED.md) sets everything up.
+
 Install first: [INSTALL.md](INSTALL.md).
 
 ```bash
@@ -34,10 +36,10 @@ reach the SYSTEM buffer with writing off, so every page, analyser and
 `bm_receive_event` consumer works exactly the same.
 
 **A change only takes effect at the next begin-of-run.** mlogger decides what to
-open when the run starts, so flipping the switch mid-run does nothing until the
-run is cycled — measured: six seconds of running after switching it on produced
-no file, and a stop/start produced one immediately. `--restart-run` does the
-cycle for you.
+open when the run starts, so flipping the switch mid-run has no effect at all
+until the run is cycled — no file appears however long you wait, and one appears
+immediately after a stop/start. `--restart-run` does the cycle for you, and
+`scripts/logging.sh` warns when a run is active.
 
 ## The knobs
 

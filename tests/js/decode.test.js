@@ -98,7 +98,7 @@ check("handles an empty payload", SAMPIC.decodeAD(new Uint8Array(0)).length === 
 // midas.js puts the banks in `event.bank` -- an ARRAY of
 // {name, type, size, data, hexdata, array} -- not `event.banks`, and not keyed
 // by name. Reading the wrong property finds no AD00, draws nothing, and reports
-// no error anywhere, which is exactly how the scope page first shipped empty.
+// no error anywhere: a page that renders perfectly and shows nothing.
 const bkToObjShaped = {
   event_id: 1,
   bank: [

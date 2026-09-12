@@ -68,7 +68,7 @@ def test_golden_blob():
     assert len(ad.tobytes()) == 2 * EXPECTED_ITEMSIZE
     assert digest == "3cf337dfbd3b2793e9fdf201b94726da93750e060bcf330345cd5f9a5215c9c7", (
         "AD00 bytes changed. If this was deliberate it is a FORMAT change: "
-        "pi_midas and every recorded .mid file read the old layout.")
+        "pi_midas and every already-recorded .mid file expect this layout.")
 
 
 def test_derived_fields_follow_the_documented_mapping():

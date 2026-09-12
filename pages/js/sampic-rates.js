@@ -9,8 +9,7 @@
 // field added there appears here without touching this file.
 //
 // The tiles are BUILT ONCE and only their values updated. Rebuilding them every
-// two seconds throws away text selection and any focus the user had, and is
-// what this page did originally.
+// two seconds would throw away text selection and any focus the user had.
 
 (function () {
   "use strict";

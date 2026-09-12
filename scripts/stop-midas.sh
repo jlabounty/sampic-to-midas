@@ -19,9 +19,9 @@ if [ -f "$FS_EXPT_DIR/.ODB.SHM" ] && fs_have_midas; then
 fi
 
 # Uses fs_pids_matching from fake-sampic-env.sh, which walks /proc and skips
-# shells. `pkill -f mhttpd` would match any command line CONTAINING "mhttpd" --
-# including the shell that invoked this script. That is not theoretical: it
-# killed the calling shell during development.
+# shells. `pkill -f mhttpd` would match any command line CONTAINING "mhttpd",
+# including the shell that invoked this script -- so it would kill its own
+# caller.
 fs_stop() {
     local label="$1" pat="$2" pids
     pids=$(fs_pids_matching "$pat")

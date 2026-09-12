@@ -91,9 +91,8 @@ class SampicAnalyzer:
         # update_structure_only ADDS keys that are missing without touching the
         # values of keys that exist, so a setting introduced in a later version
         # appears in an experiment whose ODB predates it. Seeding only when the
-        # whole subtree was absent -- which this did originally -- meant a new
-        # setting silently never appeared, and toggling it in mhttpd did
-        # nothing because there was nothing to toggle.
+        # whole subtree is absent would leave such a key missing, and a setting
+        # that is absent cannot be toggled in mhttpd -- it silently does nothing.
         #
         # remove_unspecified_keys=False so an operator's extra key, or one from
         # a newer version, is left alone rather than deleted.

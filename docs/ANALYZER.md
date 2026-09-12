@@ -79,11 +79,12 @@ The analyzer loads `config/pulse_template.json` unless
 deviation, and `SampicPersist` overlays the shape on every cell scaled to that
 cell's own amplitude.
 
-Building one from real run914 data shows why `--min-amplitude` matters: with the
-default 5 mV cut the averaged shape has a 0.49 spread *at the peak*, because
-run914's self-trigger sits near the noise and a near-threshold pulse's `argmax`
-lands on noise rather than on the pulse. At `--min-amplitude 0.03` the spread
-falls to 0.16.
+`--min-amplitude` matters more than it looks. Built from run914 with the default
+5 mV cut, the averaged shape has a 0.49 spread *at the peak* — run914's
+self-trigger sits near the noise, and a near-threshold pulse's `argmax` lands on
+noise rather than on the pulse, so the alignment misses. At
+`--min-amplitude 0.03` the spread falls to 0.16. A large spread at the peak is
+the signal that the cut is too low.
 
 ## Settings — `/Analyzer/SampicDQM`
 
@@ -153,18 +154,27 @@ and `Max Events Per Second` is what keeps it bounded. That is why it defaults to
 
 ### Pages
 
-Per open browser tab, every page costs **less than 0.2% of one core** on the DAQ
-machine — at or below the measurement noise. What differs is bandwidth:
+A page is a polling HTTP client, so its cost lands on mhttpd. Measured with four
+tabs of each page open at once:
 
-| page | requests/s | kB/s | kB per refresh |
-|---|---|---|---|
-| SampicPersist | 1.0 | 101 | 101 |
-| SampicHistos | 1.0 | 21 | 20 |
-| SampicScope / SampicGrid | 2.0 | 16 | 8 |
-| SampicRates / SampicStrips | 0.5 | <1 | <2 |
+| page | requests/s | kB/s | kB per refresh | mhttpd CPU |
+|---|---|---|---|---|
+| SampicPersist | 4.0 | 403 | 101 | +0.15% |
+| SampicHistos | 4.2 | 85 | 20 | +0.05% |
+| SampicScope / SampicGrid | 8.0 | 62 | 8 | +0.3% |
+| SampicRates / SampicStrips | 2.0 | 1–3 | <2 | +0.15% |
 
-Ten tabs of the heaviest page is ~1 MB/s. Bandwidth, not CPU, is what scales
-with viewers.
+**Four tabs of every page at once costs mhttpd well under 1% of one core.**
+Bandwidth, not CPU, is what scales with viewers: ten tabs of the heaviest page
+is about 1 MB/s.
+
+> Reading these numbers: `tools/benchmark_pages.py` re-measures the idle
+> baseline immediately before each page, because the analyzer's and frontend's
+> own load drifts with the generator rate and the rate limiter. Against a single
+> baseline taken minutes earlier that drift swamps the page signal and produces
+> nonsense — a page appearing to cost most of a core on a process it never
+> contacts. The mhttpd column is the page cost; the kB/s column is exact,
+> counted from the bytes actually returned.
 
 ## Can this run on another machine?
 
@@ -186,9 +196,9 @@ export MIDASSYS=...            # same MIDAS build
 python -m fakesampic.analyzer -h daq-host -e fakesampic
 ```
 
-Tested here over the mserver TCP path: the analyzer received **200 ev/s
-(1.65 MB/s)** and — the part that actually decides it — **`brpc` from mhttpd
-reached the remotely connected client**, so `SampicHistos` and `SampicPersist`
+Verified over the mserver TCP path: the analyzer sustains **200 ev/s
+(1.65 MB/s)**, and — the part that actually decides it — **`brpc` from mhttpd
+reaches a remotely connected client**, so `SampicHistos` and `SampicPersist`
 work against an analyzer that is not on the DAQ machine.
 
 The event data crosses the network: ~8 kB/event, so 1.6 MB/s at 200 ev/s and

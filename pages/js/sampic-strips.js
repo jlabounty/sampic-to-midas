@@ -12,9 +12,8 @@
 //   busy           blue -> orange -- scaled to the busiest strip on the page
 //
 // The DOM IS BUILT ONCE. Only cell colours, titles and the scale text are
-// updated on refresh. Rebuilding the page every two seconds -- which this did
-// originally -- also rebuilds the <select>, so it closes under the pointer of
-// anyone trying to use it.
+// updated on refresh. Rebuilding the page every two seconds would also rebuild
+// the <select>, closing it under the pointer of anyone trying to use it.
 
 (function () {
   "use strict";

@@ -1,5 +1,8 @@
 # Installing MIDAS and this frontend from scratch
 
+> Following this for the first time? [GETTING-STARTED.md](GETTING-STARTED.md)
+> walks the same ground with less detail and ends with a page you wrote.
+
 Everything lands inside the `fake_sampic/` workspace. No system directory is
 written, `/etc/exptab` is not touched, and any MIDAS experiment already on the
 machine is unaffected — `MIDAS_EXPTAB` is exported for these processes only.

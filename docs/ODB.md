@@ -1,6 +1,8 @@
-# ODB reference
+# ODB reference — the frontend
 
-Generated from `fakesampic/settings.py`, which is the schema of record.
+Generated from `fakesampic/settings.py`, which is the schema of record. The
+analyzer's own settings live under `/Analyzer/SampicDQM` and are documented in
+[ANALYZER.md](ANALYZER.md).
 
 **hot** applies on the next readout tick. **cold** rebuilds the event source and
 waits for the next begin-of-run unless `Apply Cold Settings` is `immediately`,

@@ -1,5 +1,8 @@
 # The custom pages
 
+> Never written one? [GETTING-STARTED.md](GETTING-STARTED.md) has a worked
+> example from scratch. This is the reference behind it.
+
 ```bash
 scripts/register-custom-pages.sh            # install
 scripts/register-custom-pages.sh --list     # show what would be written
@@ -76,8 +79,10 @@ Use `--prefix` to install a second copy alongside an existing one.
 
 ## Writing a new page
 
-Start from `sampic-grid.js` (event-driven) or `sampic-strips.js` (ODB-driven).
-Both follow the rules below; copy one of them rather than starting blank.
+Copy the closest existing page rather than starting blank: `sampic-grid.js` for
+an event-driven page, `sampic-strips.js` for an ODB-driven one, or
+`sampic-histos.js` for one backed by the analyzer. All of them follow the rules
+below.
 
 ### The checklist
 
@@ -144,8 +149,8 @@ Both follow the rules below; copy one of them rather than starting blank.
 | your page | layout and drawing, and as little else as possible |
 
 If you find yourself copying more than a few lines out of another page, it
-belongs in `sampic-common.js` instead. That is how the duplicated
-`bm_receive_event` loop got there.
+belongs in `sampic-common.js` instead — a helper duplicated across two pages is
+a helper that will diverge between them.
 
 ## Verifying a page actually renders
 
@@ -183,8 +188,8 @@ pkill -u $(id -u) -f '[f]akesampic\.frontend'
 `MPlotGraph`'s colormap fills one rectangle per bin and builds a CSS colour
 string for each, so a 64×220 persistence map costs 14,080 string allocations and
 14,080 `fillStyle` parses **per redraw** — and it redraws on every refresh and
-every mouse move. Measured on this machine: **7.18 ms per paint**, which is what
-makes the page lag. `sampic-h2d.js` writes the density straight into an
+every mouse move. Measured here: **7.18 ms per paint**, enough to make a page
+visibly lag. `sampic-h2d.js` writes the density straight into an
 `ImageData`, blits it once with smoothing off, and takes **0.49 ms — 14.8×
 faster**. `MPlotGraph` is still the right tool for 1-D, where 200 points cost
 nothing.
@@ -215,7 +220,7 @@ what `SAMPIC.bankBytes` prefers. Reading the wrong property finds no AD00 and
 draws nothing, with no error anywhere. `tests/js/decode.test.js` pins both the
 property name and the decode-through-`bankByName` path.
 
-## Two mhttpd rules that shaped the pages
+## Two mhttpd rules to respect
 
 **A menu key must not contain a dot.** A dot-less key is served by
 `show_custom_page()` with no cache headers; a dotted one goes through

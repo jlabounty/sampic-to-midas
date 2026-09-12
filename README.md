@@ -36,9 +36,14 @@ default), or mixes the two, with every knob in the ODB.
     scripts/start-frontend.sh --daemon
     scripts/register-custom-pages.sh
 
-Documentation: [docs/INSTALL.md](docs/INSTALL.md) ·
-[docs/RUNNING.md](docs/RUNNING.md) · [docs/ODB.md](docs/ODB.md) ·
-[docs/PAGES.md](docs/PAGES.md)
+**New here? Start with [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)** — it
+goes from a machine with nothing installed to a custom page you wrote yourself,
+in about half an hour.
+
+Reference: [INSTALL.md](docs/INSTALL.md) (building MIDAS) ·
+[RUNNING.md](docs/RUNNING.md) (operating it) · [ODB.md](docs/ODB.md) (every
+setting) · [PAGES.md](docs/PAGES.md) (writing pages) ·
+[ANALYZER.md](docs/ANALYZER.md) (the histogram backend, and what it all costs)
 
 The two halves share `converter/sampic_banks.py`, which is the single place any
 hit becomes bank bytes. That is what makes the guarantee below testable: events

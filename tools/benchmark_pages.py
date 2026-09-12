@@ -12,9 +12,20 @@ and measures the CPU those processes burn and the bytes crossing the socket.
 Why this matters: the answer decides whether a shift screen can sit on another
 machine, or whether every open browser tab is competing with the DAQ for CPU.
 
-CPU is read from /proc/<pid>/stat (utime+stime), memory from VmRSS. The numbers
-are per-page DELTAS over an idle baseline measured the same way, so the
-frontend's own load does not appear in them.
+CPU is read from /proc/<pid>/stat (utime+stime), memory from VmRSS.
+
+Each page's cost is a DELTA over an idle baseline, and the baseline is
+re-measured immediately before every page rather than once at the start. That
+matters: the analyzer's and frontend's own load drifts with the generator rate,
+the run state and the analyzer's rate limiter, and against a single baseline
+taken minutes earlier that drift swamps the page signal entirely -- it will
+happily report a page "costing" 70% of a core on a process it never talks to.
+Interleaving the baselines cancels the slow drift.
+
+Even so, treat the analyzer and frontend columns as indicative: their load is
+not page-driven and is inherently noisy. mhttpd's column is the one that
+measures what a page actually costs, and the kB/s column -- counted in this
+process, from the bytes actually returned -- is exact.
 """
 
 import argparse
@@ -200,27 +211,34 @@ def main(argv=None) -> int:
           ", ".join(f"{k} {rss_mb(v):.0f} MB" for k, v in sorted(pids.items())
                     if rss_mb(v)))
 
-    print(f"\nidle baseline ({args.seconds:.0f} s, no pages open)")
-    idle = measure("(idle)", 1e9, [], args.seconds, pids, 0)
-    print("  cpu%: " + ", ".join(f"{k} {v}" for k, v in idle["cpu"].items()))
+    base_len = max(args.seconds / 2.0, 5.0)
+    idle0 = measure("(idle)", 1e9, [], base_len, pids, 0)
+    print(f"\nidle load, no pages open ({base_len:.0f} s)")
+    print("  cpu%: " + ", ".join(f"{k} {v}" for k, v in idle0["cpu"].items()))
 
-    results = [idle]
+    results = [idle0]
     print(f"\nper page, {args.tabs} tab(s) each, {args.seconds:.0f} s")
-    print(f"  {'page':15s} {'calls/s':>8s} {'kB/s':>8s} {'kB/req':>7s}   cpu% by process")
+    print(f"  {'page':15s} {'calls/s':>8s} {'kB/s':>8s} {'kB/req':>7s}   mhttpd cpu%   other")
     for page in args.pages:
         if page not in PAGES:
             print(f"  unknown page {page}", file=sys.stderr)
             continue
         interval, requests = PAGES[page]
+        # Baseline immediately before this page, not once at the start.
+        idle = measure("(idle)", 1e9, [], base_len, pids, 0)
         r = measure(page, interval, requests, args.seconds, pids, args.tabs)
-        # Subtract the idle load so the number is what the PAGE costs.
         for k in list(r["cpu"]):
             r["cpu"][k] = round(r["cpu"][k] - idle["cpu"].get(k, 0.0), 2)
+        r["idle_before"] = idle["cpu"]
         results.append(r)
-        cpu = ", ".join(f"{k} {v:+.2f}" for k, v in r["cpu"].items() if abs(v) >= 0.01)
+        mh = r["cpu"].get("mhttpd", 0.0)
+        other = ", ".join(f"{k} {v:+.1f}" for k, v in r["cpu"].items()
+                          if k != "mhttpd" and abs(v) >= 0.5)
         print(f"  {page:15s} {r['calls_per_s']:8.2f} {r['kB_per_s']:8.1f} "
-              f"{r['kB_per_refresh']:7.1f}   {cpu or 'below noise'}"
+              f"{r['kB_per_refresh']:7.1f}   {mh:+11.2f}   {other or '-'}"
               + (f"   [{r['errors']} errors]" if r["errors"] else ""))
+    print("\n  mhttpd cpu% is the page cost. 'other' is analyzer/frontend drift,")
+    print("  which is not page-driven -- see the module docstring.")
 
     if args.json:
         with open(args.json, "w") as f:

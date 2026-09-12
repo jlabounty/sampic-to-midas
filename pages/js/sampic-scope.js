@@ -194,8 +194,8 @@
     SDQM.loadGeometry().then(function (g) { geom = g; });
 
     // The buffer poll lives in SDQM.eventPoller, shared with every other page
-    // that reads events -- it used to be copy-pasted, which is how the
-    // event_id workaround inside it drifts out of sync between pages.
+    // that reads events, so the event_id workaround inside it stays in one
+    // place rather than drifting between pages.
     poller = SDQM.eventPoller({
       eventId: EVENT_ID,
       intervalMs: 500,
