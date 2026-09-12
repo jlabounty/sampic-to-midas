@@ -14,6 +14,31 @@ buffer directly, so they work whenever the frontend is running.
 | **SampicScope** | `bm_receive_event` on SYSTEM | waveforms from the newest event, decoded in the browser, with a per-hit table |
 | **SampicStrips** | `FakeSampicDQM` Variables + Settings | the detector as a picture: one row per plane, one cell per strip, coloured by rate or amplitude |
 | **SampicRates** | `FSST` + equipment Statistics | generator rate, backlog, drops, readout duty, loops |
+| **SampicGrid** | `bm_receive_event` + geometry | one event laid out as the detector: a waveform per plane/strip cell |
+
+## SampicGrid and the y-range toggle
+
+One row per plane, one column per strip. A cell carries that channel's waveform
+if the event had a hit on it and is left blank if not, so the hit pattern is
+visible as a shape rather than as a list of channel numbers — a track through
+alternating X and Y planes shows up immediately as two vertical stripes.
+
+The toggle is the substance of the page, and the two modes answer different
+questions:
+
+| `y range` | every cell uses | good for | misleading about |
+|---|---|---|---|
+| `shared across the event` | one range from the whole event | comparing amplitudes; seeing which strips actually collected charge | small pulses look almost flat |
+| `per cell (autoscale)` | its own min/max | shape and timing on quiet channels | heights across cells mean nothing |
+
+The amplitude is printed in each cell in mV precisely because per-cell mode
+makes the trace height incomparable — in that mode the number is the only thing
+you can compare between cells. The mode is also in the URL (`&y=cell`), so a
+particular view can be bookmarked or left up on a shift screen.
+
+Cells are plain 2D canvases, not `MPlotGraph` figures: an 8×10 detector is 80
+cells, and 80 full figures with axes, legends and mouse handlers is far more
+machinery than a 64-sample sparkline needs.
 
 They are a starting point for a real DQM suite, and are deliberately written the
 way the `wavedream-midas-dqm` pages are, so they can grow the same way.

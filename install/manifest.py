@@ -59,6 +59,8 @@ ENTRIES: Tuple[Entry, ...] = (
           "per-strip occupancy across the plane stack (no backend)"),
     Entry("SampicRates", "sampic-rates.html", True,
           "generator rate, health and backlog (no backend)"),
+    Entry("SampicGrid", "sampic-grid.html", True,
+          "one event as the detector: a waveform per plane/strip cell"),
     Entry("sampic-common.js", "js/sampic-common.js", False,
           "shared ODB/geometry helpers"),
     Entry("sampic-banks.js", "js/sampic-banks.js", False,
@@ -66,6 +68,7 @@ ENTRIES: Tuple[Entry, ...] = (
     Entry("sampic-scope.js", "js/sampic-scope.js", False, "scope page"),
     Entry("sampic-strips.js", "js/sampic-strips.js", False, "strip map page"),
     Entry("sampic-rates.js", "js/sampic-rates.js", False, "rates page"),
+    Entry("sampic-grid.js", "js/sampic-grid.js", False, "waveform grid page"),
     Entry("sampic.css", "css/sampic.css", False, "the little midas.css does not cover"),
 )
 

@@ -1,25 +1,27 @@
 <!--
-  SAMPIC Scope -- a fake-SAMPIC DQM page.
+  SAMPIC Waveform Grid -- a fake-SAMPIC DQM page.
 
   Stock MIDAS resources are loaded by bare name so mhttpd serves its own copies;
   ours carry a ?v= cache-buster, because mhttpd stamps a 24 h Expires header on
   any /Custom file whose key contains a dot, and an edited page that does not
   appear is a confusing way to lose an afternoon. Bump ?v= when editing.
+
+  No mplot.js here: the cells are drawn directly on small canvases, because 80
+  full MPlotGraph figures is far more machinery than a 64-sample sparkline needs.
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>SAMPIC Scope</title>
+  <title>SAMPIC Waveform Grid</title>
   <link rel="stylesheet" href="midas.css">
   <script src="controls.js"></script>
   <script src="midas.js"></script>
   <script src="mhttpd.js"></script>
-  <script src="mplot.js"></script>
   <link rel="stylesheet" href="sampic.css?v=2">
   <script src="sampic-common.js?v=1"></script>
   <script src="sampic-banks.js?v=2"></script>
-  <script src="sampic-scope.js?v=4"></script>
+  <script src="sampic-grid.js?v=3"></script>
 </head>
 <body class="mcss">
   <div id="mheader"></div>
