@@ -18,18 +18,30 @@ if [ -f "$FS_EXPT_DIR/.ODB.SHM" ] && fs_have_midas; then
     odbedit -e "$FS_EXPT_NAME" -c "stop now" >/dev/null 2>&1 || true
 fi
 
-for name in fake-sampic-fe mlogger mhttpd; do
-    if pgrep -u "$(id -u)" -f "$name" >/dev/null 2>&1; then
-        echo "stopping $name"
-        pkill -u "$(id -u)" -f "$name" || true
-    fi
-done
+# Uses fs_pids_matching from fake-sampic-env.sh, which walks /proc and skips
+# shells. `pkill -f mhttpd` would match any command line CONTAINING "mhttpd" --
+# including the shell that invoked this script. That is not theoretical: it
+# killed the calling shell during development.
+fs_stop() {
+    local label="$1" pat="$2" pids
+    pids=$(fs_pids_matching "$pat")
+    [ -z "$pids" ] && return 0
+    echo "stopping $label ($(echo $pids | tr '\n' ' '))"
+    kill $pids 2>/dev/null || true
+    for _ in $(seq 1 50); do
+        pids=$(fs_pids_matching "$pat")
+        [ -z "$pids" ] && return 0
+        sleep 0.1
+    done
+    pids=$(fs_pids_matching "$pat")
+    [ -n "$pids" ] && { echo "  forcing $label"; kill -9 $pids 2>/dev/null || true; }
+    return 0
+}
 
-for _ in $(seq 1 50); do
-    pgrep -u "$(id -u)" -f "mhttpd -e $FS_EXPT_NAME" >/dev/null 2>&1 || break
-    sleep 0.1
-done
-pkill -9 -u "$(id -u)" -f "mhttpd -e $FS_EXPT_NAME" 2>/dev/null || true
+fs_stop "frontend" "python.* -m fakesampic\.frontend"
+fs_stop "analyzer" "python.* -m fakesampic\.analyzer"
+fs_stop "mlogger"  "mlogger -e $FS_EXPT_NAME"
+fs_stop "mhttpd"   "mhttpd -e $FS_EXPT_NAME"
 
 if [ "$CLEAN" = 1 ]; then
     echo "removing ODB and shared memory"

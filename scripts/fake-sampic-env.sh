@@ -44,12 +44,13 @@ case ":$PATH:" in
     *) export PATH="$MIDASSYS/bin:$PATH" ;;
 esac
 
-# No LD_LIBRARY_PATH here on purpose. Where MIDAS links zlib from the conda
-# environment (see docs/INSTALL.md), setup-midas.sh embeds an RPATH in the
-# binaries instead. Exporting LD_LIBRARY_PATH globally would put conda's
-# libtinfo, libssl and so on ahead of the system ones for EVERY program this
-# shell runs -- /bin/bash included, which starts printing version warnings --
-# and that is a broad change to make for one library.
+# No LD_LIBRARY_PATH here on purpose. With zlib1g-dev installed MIDAS links the
+# system zlib and needs nothing; on a machine without it, setup-midas.sh falls
+# back to conda's zlib and embeds an RPATH in the binaries instead. Exporting
+# LD_LIBRARY_PATH globally would put conda's libtinfo, libssl and so on ahead of
+# the system ones for EVERY program this shell runs -- /bin/bash included, which
+# then prints version warnings -- and that is a broad change to make for one
+# library.
 
 # --- python -------------------------------------------------------------------
 
@@ -83,7 +84,35 @@ fs_require_python() {
     fi
 }
 
-fs_is_running() { pgrep -u "$(id -u)" -f "$1.*-e $FS_EXPT_NAME" >/dev/null 2>&1; }
+# Find our own running daemons.
+#
+# NOT `pgrep -f`, which matches whole command lines and therefore matches any
+# shell whose command line happens to mention the program -- including the shell
+# calling this function, and including an unrelated terminal running
+# `tail -f mhttpd.log`. During development that made start-midas.sh report
+# "mhttpd already running" when no mhttpd existed at all, and made stop-midas.sh
+# kill its own caller.
+#
+# Walk /proc instead, skip anything whose executable is a shell or a process
+# tool, and match the rest on their command line. A daemon of ours is never
+# named bash.
+fs_pids_matching() {
+    local want="$1" pid comm cmdline uid
+    uid="$(id -u)"
+    for pid in /proc/[0-9]*; do
+        pid="${pid#/proc/}"
+        [ -r "/proc/$pid/cmdline" ] || continue
+        [ "$(stat -c %u "/proc/$pid" 2>/dev/null)" = "$uid" ] || continue
+        comm="$(cat "/proc/$pid/comm" 2>/dev/null)" || continue
+        case "$comm" in
+            bash|sh|dash|zsh|ksh|pgrep|pkill|ps|grep|tail|less|vim|nano) continue ;;
+        esac
+        cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)"
+        case "$cmdline" in *"$want"*) echo "$pid" ;; esac
+    done
+}
+
+fs_is_running() { [ -n "$(fs_pids_matching "$1 -e $FS_EXPT_NAME")" ]; }
 
 fs_banner() {
     echo "fake-sampic environment"

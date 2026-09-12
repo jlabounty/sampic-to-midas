@@ -64,7 +64,9 @@ scripts/setup-conda.sh
 They are handled automatically, and are written down because each one fails in
 a way that does not point at its cause.
 
-**zlib is mandatory and cmake does not finish the job.**
+**zlib is mandatory and cmake does not finish the job.** (With `zlib1g-dev`
+installed none of this applies and the build is unremarkable; it is written down
+for machines without root.)
 MIDAS does `find_package(ZLIB REQUIRED)` (`CMakeLists.txt:236`) and
 `midasio.cxx` includes `<zlib.h>`, but the include directory is never added to
 the compile flags — so cmake happily reports *"Found ZLIB"* and the build then

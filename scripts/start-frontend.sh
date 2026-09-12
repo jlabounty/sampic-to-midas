@@ -21,11 +21,11 @@ if [ ! -f "$FS_EXPT_DIR/.ODB.SHM" ]; then
     exit 1
 fi
 
-# -f matches the whole command line, which includes the pattern itself when the
-# search runs from a shell whose own command line contains it. Match the python
-# binary to avoid pgrep finding this very script.
-if pgrep -u "$(id -u)" -f "[f]akesampic\.frontend" | grep -qv "^$$\$"; then
-    echo "ERROR: a fake-sampic frontend is already running (pid $(pgrep -u "$(id -u)" -f '[f]akesampic\.frontend' | head -1))." >&2
+# fs_pids_matching skips shells, so this cannot match the script itself -- a
+# plain `pgrep -f` here reported "already running" against its own command line.
+_fs_running="$(fs_pids_matching "fakesampic.frontend")"
+if [ -n "$_fs_running" ]; then
+    echo "ERROR: a fake-sampic frontend is already running (pid $(echo $_fs_running | cut -d' ' -f1))." >&2
     echo "       Stop it first, or run scripts/stop-midas.sh." >&2
     exit 1
 fi

@@ -46,7 +46,24 @@ start_one() {
     fi
     echo "starting $name"
     ( cd "$FS_EXPT_DIR" && "$@" ) || {
-        echo "ERROR: $name failed to start" >&2; return 1; }
+        echo "ERROR: $name exited non-zero on launch" >&2; return 1; }
+
+    # -D daemonises, so the launch returning 0 says nothing about whether the
+    # daemon survived. It frequently does not when start follows stop closely:
+    # the previous mhttpd still holds port 8080, the new one fails to bind and
+    # exits, and without this check the script reports success and leaves you
+    # with no web server.
+    local i
+    for i in $(seq 1 50); do
+        fs_is_running "$name" && return 0
+        sleep 0.1
+    done
+    echo "ERROR: $name did not stay running." >&2
+    if [ "$name" = "mhttpd" ]; then
+        echo "       Usually port $FS_MHTTPD_PORT is still held by a previous" >&2
+        echo "       mhttpd. Check with: ss -ltnp | grep $FS_MHTTPD_PORT" >&2
+    fi
+    return 1
 }
 
 # The port is an ODB setting, not a command-line flag, in this MIDAS series:
