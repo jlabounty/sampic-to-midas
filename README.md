@@ -48,7 +48,9 @@ setting) · [PAGES.md](docs/PAGES.md) (writing pages) ·
 The two halves share `converter/sampic_banks.py`, which is the single place any
 hit becomes bank bytes. That is what makes the guarantee below testable: events
 replayed live through MIDAS and written by mlogger are **byte-identical** to the
-same file converted offline — verified over all 42258 events of run914.
+same file converted offline — verified over all 42258 events of run914 — and a
+run file from the live frontend goes through the PIONEER Gaudi reconstruction
+unmodified (`scripts/reconstruct.sh`).
 
 ---
 

@@ -132,6 +132,58 @@ $FS_PYTHON -m fakesampic.offline --source binfile --files "$FS_DEFAULT_BIN" \
 $FS_PYTHON tools/compare_mid.py /tmp/ref.mid /tmp/fe.mid
 ```
 
+## Reconstructing a run file with Gaudi
+
+A run file this frontend produces goes through the PIONEER reconstruction
+unmodified — that is the whole reason the banks are byte-identical to what
+`pi_midas` expects.
+
+```bash
+scripts/reconstruct.sh ../online/data/run00019.mid          # -> output/run00019_rec.root
+scripts/reconstruct.sh run.mid "" 500                       # first 500 events
+```
+
+It runs `PIMidasSelector → PIMidasDecoder(PITMidasSampic) → PIAOutputStream`
+inside the `pioneer-midas` container and writes an RNTuple named `rec`. It needs
+`main/` to have been built in that container once
+(`scripts/run_container.sh`, then `cd /workdir/main && ./setup.sh -b -t -e`).
+
+Read the result with uproot:
+
+```python
+import uproot, awkward as ak
+rec  = uproot.open("output/run00019_rec.root")["rec"]
+hits = rec.arrays(library="ak")["_Event_SampicEvent"]["hits"]
+ak.flatten(hits["corrected_waveform"])      # 64 samples per hit, volts
+ak.flatten(hits["amplitude"])               # and every other Hit field
+```
+
+Verified on a synthetic 8-plane run: 4623 hits over 200 entries, and the
+channel, amplitude, timestamp and all 64 waveform samples of every hit are
+bit-identical to the AD00 banks in the `.mid`.
+
+### Two entries carry no hits
+
+`hits` is empty for two kinds of entry, and an analysis should skip empty ones
+rather than assume every entry is a physics event:
+
+* **Gaudi's event-loop priming entry**, always the first one.
+* **Events from other equipment.** The DQM equipment writes `FSRT`/`FSAM`/`FSST`
+  (event ID 200) into the same buffer, and mlogger records them. They have no
+  AD00 bank, so `PIMidasDecoder` assigns its null decoder — logging
+  `No decoder for bank FSRT. Assigning NullDecoder!` — and the entry comes
+  through empty. Nothing breaks.
+
+To keep them out of the run file entirely, restrict the logger to the physics
+event ID:
+
+```bash
+odbedit -e fakesampic -c 'set "/Logger/Channels/0/Settings/Event ID" 1'
+```
+
+That also makes `tools/validate_midas.py` and `tools/compare_mid.py` usable
+without their `--event-id` flag.
+
 ## Tests
 
 ```bash

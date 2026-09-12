@@ -243,7 +243,7 @@ $FS_PYTHON tests/js/decode.test.js    # needs node; optional
 | you want to | read |
 |---|---|
 | understand a setting | [ODB.md](ODB.md) |
-| operate the experiment, or verify the chain end to end | [RUNNING.md](RUNNING.md) |
+| operate the experiment, verify the chain, or run a file through the Gaudi reconstruction | [RUNNING.md](RUNNING.md) |
 | write more pages | [PAGES.md](PAGES.md) |
 | add a histogram, or run the analyzer on another machine | [ANALYZER.md](ANALYZER.md) |
 | fix a build problem | [INSTALL.md](INSTALL.md) |
