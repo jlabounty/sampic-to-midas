@@ -78,6 +78,23 @@ odbedit -e "$FS_EXPT_NAME" -c 'set "/Experiment/Buffer sizes/SYSTEM" 134217728' 
 # Run files go under online/data, never into the repository.
 odbedit -e "$FS_EXPT_NAME" -c "set \"/Logger/Data dir\" \"$FS_DATA_DIR\"" >/dev/null 2>&1 || true
 
+# Writing is OFF by default. This experiment exists to feed DQM pages with a
+# live stream, and the data is fabricated -- recording it has no value while
+# costing over a MB/s (a gigabyte an hour) of disk that nobody will read. Events
+# still reach the SYSTEM buffer, so every page and analyser works unchanged.
+#
+# scripts/logging.sh on   when you actually want a run file.
+if [ "${FS_LOGGING:-off}" = "off" ]; then
+    odbedit -e "$FS_EXPT_NAME" -c 'set "/Logger/Write data" n' >/dev/null 2>&1 || true
+else
+    odbedit -e "$FS_EXPT_NAME" -c 'set "/Logger/Write data" y' >/dev/null 2>&1 || true
+fi
+
+# Uncompressed, so converter/mid_reader.py (plain .mid only) can read whatever
+# does get written. mlogger defaults to lz4 via the "Compress" string; the
+# legacy "Compression" integer is not the one that decides.
+odbedit -e "$FS_EXPT_NAME" -c 'set "/Logger/Channels/0/Settings/Compress" none' >/dev/null 2>&1 || true
+
 echo
 fs_banner
 echo

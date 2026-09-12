@@ -17,6 +17,36 @@ the parent directory mounted at `/workdir` in the container. Only the
 `scripts/` and the notebook's default paths depend on that layout — the
 converter and validator are standalone (any python >= 3.8 with numpy).
 
+
+## Two halves
+
+**Offline** (`converter/`, `tools/`) — turn a SAMPIC `.bin` into a `.mid` file,
+and prove it is correct. This is the original content of the repository and is
+described below.
+
+**Live** (`fakesampic/`, `pages/`, `scripts/`) — a MIDAS frontend that produces
+the same events as a continuous stream, so MIDAS custom pages can be developed
+with no detector attached. It replays real `.bin` files on an endless loop,
+generates events for detectors that do not exist yet (8 layers of LGAD strips by
+default), or mixes the two, with every knob in the ODB.
+
+    scripts/setup-conda.sh          # python environment
+    scripts/setup-midas.sh          # build MIDAS from source into ../midas
+    scripts/start-midas.sh          # the experiment -> http://localhost:8080
+    scripts/start-frontend.sh --daemon
+    scripts/register-custom-pages.sh
+
+Documentation: [docs/INSTALL.md](docs/INSTALL.md) ·
+[docs/RUNNING.md](docs/RUNNING.md) · [docs/ODB.md](docs/ODB.md) ·
+[docs/PAGES.md](docs/PAGES.md)
+
+The two halves share `converter/sampic_banks.py`, which is the single place any
+hit becomes bank bytes. That is what makes the guarantee below testable: events
+replayed live through MIDAS and written by mlogger are **byte-identical** to the
+same file converted offline — verified over all 42258 events of run914.
+
+---
+
 ## Layout
 
 | Path | Purpose |
