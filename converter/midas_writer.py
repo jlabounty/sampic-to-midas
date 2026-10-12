@@ -13,6 +13,10 @@ midasio.cxx) and what pi_midas' PIMidasSelector/TMEvent::FindNextBank parse:
             data_size == 0, PIMidasSelector::next() evaluates &data[16] on a
             16-byte vector, which trips the bounds assertion in debug-STL
             builds (real MIDAS files always carry an ODB dump there).
+            It must also be a valid JSON document: PIMidasSelector::ReadBOR()
+            passes the BOR payload to PIODBHeader::SetJson(), which parses it
+            with nlohmann::json and throws json::parse_error on anything else.
+            Real ODB dumps are NUL-terminated JSON, so we emit that too.
 
 Only plain uncompressed files are written; name them *.mid so midasio's
 TMNewReader picks the plain reader by extension.
@@ -40,10 +44,19 @@ def _align8(n: int) -> int:
 
 
 class MidasFileWriter:
-    def __init__(self, path: str, buffer_bytes: int = 1 << 20):
+    def __init__(self, path: str, buffer_bytes: int = 1 << 20,
+                 odb_json: bytes = None):
+        """`odb_json` is the BOR/EOR payload: a JSON document standing in for
+        the ODB dump a real MIDAS run would carry. See the note above -- it
+        must be valid JSON. Defaults to a minimal placeholder.
+        """
         self._f = open(path, "wb", buffering=buffer_bytes)
         self.events_written = 0
         self.bytes_written = 0
+        if odb_json is not None:
+            if not odb_json.endswith(b"\x00"):
+                odb_json += b"\x00"
+            self._SPECIAL_PAYLOAD = odb_json
 
     def write_event(self, event_id: int, trigger_mask: int, serial: int,
                     time_stamp: int, banks: Iterable[Bank]):
@@ -76,7 +89,8 @@ class MidasFileWriter:
     def write_eor(self, run_number: int, time_stamp: int = None):
         self._write_special(EOR_EVENT_ID, run_number, time_stamp)
 
-    _SPECIAL_PAYLOAD = b"fake-sampic-odb\x00"
+    # Valid JSON, NUL-terminated: see the ODB note in the module docstring.
+    _SPECIAL_PAYLOAD = b'{"Experiment":{"Name":"fake-sampic"}}\x00'
 
     def _write_special(self, event_id: int, run_number: int, time_stamp: int):
         if time_stamp is None:

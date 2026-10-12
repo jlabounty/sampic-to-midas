@@ -29,7 +29,12 @@ from typing import Iterator, Optional
 
 import numpy as np
 
-N_HEADER_LINES = 7
+# The number of ASCII header lines is NOT fixed across SAMPIC software
+# versions: reduced-data-type files carry 7, full files carry 8 (an extra
+# "TriggerPosition" descriptor line). Every header line starts with '=' and is
+# newline-terminated, so the count is detected rather than assumed.
+MIN_HEADER_LINES = 5
+MAX_HEADER_LINES = 16
 FIXED_RECORD_BYTES = 33  # bytes before the waveform samples
 WFSIZE_OFFSET = 32       # offset of the WaveformSize byte within a record
 MAX_SAMPLES = 64         # kMaxSamples in pi_midas sampic/EventBankUnpacker.hh
@@ -72,33 +77,45 @@ def _search(pattern, text, cast, default=None):
 
 
 def parse_header(f) -> BinHeader:
-    """Read the 7 ASCII header lines from a file object opened in binary mode.
+    """Read the ASCII header from a file object opened in binary mode.
+
+    Consumes lines while they look like header lines (start with '=' and are
+    newline-terminated), so both the 7-line reduced-data-type layout and the
+    8-line full layout are handled. Fields are searched for across the whole
+    header rather than at fixed line numbers, since their line differs between
+    the two.
 
     Leaves the file positioned at the first binary record byte.
     """
     lines = []
-    for i in range(N_HEADER_LINES):
-        line = f.readline()
-        if not line.endswith(b"\n"):
-            raise SampicBinError(f"header line {i + 1} is not newline-terminated")
-        lines.append(line.decode("ascii", errors="replace"))
-    header_bytes = sum(len(l) for l in lines)
+    header_bytes = 0
+    while len(lines) < MAX_HEADER_LINES:
+        start = f.tell()
+        raw = f.readline()
+        if not raw.endswith(b"\n") or not raw.startswith(b"="):
+            f.seek(start)   # not a header line: the binary body starts here
+            break
+        header_bytes += len(raw)
+        lines.append(raw.decode("ascii", errors="replace"))
 
-    l1, l2, l3, l4 = lines[0], lines[1], lines[2], lines[3]
-    l7 = lines[6]
+    if len(lines) < MIN_HEADER_LINES:
+        raise SampicBinError(
+            f"only {len(lines)} ASCII header lines found; not a SAMPIC file?")
+
+    text = "".join(lines)
 
     header = BinHeader(
-        software_version=_search(r"SOFTWARE VERSION:\s*(\S+)", l1, str, default="unknown"),
-        unix_time=_search(r"UnixTime\s*=\s*([0-9.]+)", l1, float, default=0.0),
-        n_channels=_search(r"NB OF CHANNELS IN SYSTEM\s*(\d+)", l2, int, default=0),
-        fe_board_index=_search(r"FRONT-END FPGA INDEX:\s*(\d+)", l2, int, default=0),
-        sampling_freq_msps=_search(r"SAMPLING FREQUENCY\s*(\d+)", l3, int),
-        enabled_channels_mask=_search(r"Enabled Channels Mask:\s*([0-9A-Fa-f]+)", l3,
+        software_version=_search(r"SOFTWARE VERSION:\s*(\S+)", text, str, default="unknown"),
+        unix_time=_search(r"UnixTime\s*=\s*([0-9.]+)", text, float, default=0.0),
+        n_channels=_search(r"NB OF CHANNELS IN SYSTEM\s*(\d+)", text, int, default=0),
+        fe_board_index=_search(r"FRONT-END FPGA INDEX:\s*(\d+)", text, int, default=0),
+        sampling_freq_msps=_search(r"SAMPLING FREQUENCY\s*:?\s*(\d+)", text, int),
+        enabled_channels_mask=_search(r"Enabled Channels Mask:\s*([0-9A-Fa-f]+)", text,
                                       lambda s: int(s, 16), default=0),
-        data_in_file_type=_search(r"DATA_IN_FILE_TYPE:\s*(\d+)", l4, int),
-        compact_binary=_search(r"COMPACT BINARY DATA:\s*(YES|NO)", l4, str, default="NO") == "YES",
-        inl_corrected=_search(r"INL Correction:\s*(ON|OFF)", l7, str, default="OFF") == "ON",
-        adc_corrected=_search(r"ADC Correction:\s*(ON|OFF)", l7, str, default="OFF") == "ON",
+        data_in_file_type=_search(r"DATA_IN_FILE_TYPE:\s*(\d+)", text, int),
+        compact_binary=_search(r"COMPACT BINARY DATA:\s*(YES|NO)", text, str, default="NO") == "YES",
+        inl_corrected=_search(r"INL Correction:\s*(ON|OFF)", text, str, default="OFF") == "ON",
+        adc_corrected=_search(r"ADC Correction:\s*(ON|OFF)", text, str, default="OFF") == "ON",
         header_bytes=header_bytes,
         raw_lines=tuple(lines),
     )

@@ -45,6 +45,9 @@ def main(argv=None) -> int:
                    help="gap used at conversion time (default 100)")
     p.add_argument("--no-timing-bank", action="store_true",
                    help="the file was produced without AT00 banks")
+    p.add_argument("--max-hits", type=int, default=None,
+                   help="the .mid was produced with this --max-hits; compare "
+                        "against the same leading slice of the .bin")
     args = p.parse_args(argv)
 
     bf = sampic_bin.BinFile(args.bin_file)
@@ -58,6 +61,11 @@ def main(argv=None) -> int:
         order = np.argsort(t0, kind="stable")
         bin_hits = bin_hits[order]
         t0 = t0[order]
+    if args.max_hits is not None:
+        # bin_to_mid applies --max-hits after sorting, so the same leading
+        # slice of the time-ordered hits is the right comparison.
+        bin_hits = bin_hits[:args.max_hits]
+        t0 = t0[:args.max_hits]
     exp_starts = event_builder.cluster_starts(t0, args.gap_ns)
     exp_bounds = np.concatenate((exp_starts, [len(t0)]))
 

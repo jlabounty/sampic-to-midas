@@ -90,7 +90,16 @@ def convert(args) -> int:
         n_events = 0
         hits_per_event_min = None
         hits_per_event_max = 0
-        with MidasFileWriter(args.output) as writer:
+        odb_json = None
+        if args.odb_json:
+            with open(args.odb_json, "rb") as odb_file:
+                odb_json = odb_file.read().strip()
+            import json as _json
+            _json.loads(odb_json)   # fail here, not inside Gaudi's parser
+            if args.verbose:
+                print(f"ODB payload: {len(odb_json)} bytes from {args.odb_json}")
+
+        with MidasFileWriter(args.output, odb_json=odb_json) as writer:
             if not args.no_bor_eor:
                 writer.write_bor(run_number, int(header.unix_time))
 
@@ -178,6 +187,11 @@ def main(argv=None) -> int:
                    help="read at most N hits from the input")
     p.add_argument("--fe-board-index", type=int, default=None,
                    help="override the FE board index from the file header")
+    p.add_argument("--odb-json", default=None,
+                   help="JSON file to carry as the BOR/EOR ODB payload, so the "
+                        "Gaudi chain can resolve the run configuration the way "
+                        "it will from a real MIDAS ODB (see "
+                        "tools/run_settings_to_odb.py)")
     p.add_argument("--no-bor-eor", action="store_true",
                    help="do not write begin/end-of-run marker events")
     p.add_argument("--no-timing-bank", action="store_true",
